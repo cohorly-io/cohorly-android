@@ -10,7 +10,22 @@ find-and-replace of `MixpanelAPI` -> `Cohorly` plus an `apiHost` argument.
 
 ## Installation
 
-The SDK is not on Maven Central yet. Two options:
+**JitPack** (recommended - built from [cohorly-io/cohorly-android](https://github.com/cohorly-io/cohorly-android)):
+
+```kotlin
+// settings.gradle.kts
+dependencyResolutionManagement {
+    repositories {
+        google(); mavenCentral()
+        maven("https://jitpack.io")
+    }
+}
+
+// app/build.gradle.kts
+dependencies {
+    implementation("com.github.cohorly-io.cohorly-android:cohorly-android:v0.1.0")
+}
+```
 
 **Maven local** (development):
 
@@ -20,17 +35,10 @@ cd sdks/android
 ```
 
 ```kotlin
-// settings.gradle.kts
-dependencyResolutionManagement { repositories { mavenLocal(); google(); mavenCentral() } }
-
-// app/build.gradle.kts
 dependencies {
-    implementation("com.cohorly:cohorly-android:0.1.0")
+    implementation("com.cohorly:cohorly-android:0.1.0") // mavenLocal()
 }
 ```
-
-**JitPack** (once the repo is public): add the JitPack repository and depend on
-the GitHub coordinates; JitPack builds `sdks/android` on demand.
 
 The host app must declare the `INTERNET` permission (virtually every app
 already does):
