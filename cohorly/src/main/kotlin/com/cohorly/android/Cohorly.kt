@@ -12,11 +12,11 @@ import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 
 /**
- * Cohorly Android SDK - Mixpanel-style product analytics for a self-hosted
+ * Cohorly Android SDK - Mixpanel-style product analytics for a hosted
  * Cohorly server.
  *
  * ```kotlin
- * val cohorly = Cohorly.getInstance(context, "PROJECT_TOKEN", "https://analytics.example.com")
+ * val cohorly = Cohorly.getInstance(context, "PROJECT_TOKEN")
  * cohorly.track("Signed Up", JSONObject().put("plan", "pro"))
  * ```
  *
@@ -34,20 +34,24 @@ class Cohorly private constructor(
     companion object {
         private val instances = HashMap<String, Cohorly>()
 
+        /** Cohorly's hosted ingestion API, used when no apiHost is supplied. */
+        const val DEFAULT_API_HOST = "https://cohorly-service.velloalabs.com"
+
         /**
          * Returns the singleton for [token], creating it on first call.
          *
          * @param context any context; the application context is retained.
          * @param token   the Cohorly project token.
-         * @param apiHost the Cohorly server origin, e.g. `https://analytics.example.com`
-         *                (events go to `{apiHost}/track`).
+         * @param apiHost the Cohorly ingestion origin (events go to `{apiHost}/track`).
+         *                Defaults to the hosted endpoint [DEFAULT_API_HOST]; only set
+         *                this to point at a different deployment.
          */
         @JvmStatic
         @JvmOverloads
         fun getInstance(
             context: Context,
             token: String,
-            apiHost: String,
+            apiHost: String = DEFAULT_API_HOST,
             config: CohorlyConfig = CohorlyConfig(),
             transport: CohorlyTransport = HttpUrlConnectionTransport(),
         ): Cohorly {

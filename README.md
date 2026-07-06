@@ -1,6 +1,6 @@
 # Cohorly Android SDK
 
-Official Android client SDK for [Cohorly](../../README.md), the self-hosted
+Official Android client SDK for [Cohorly](../../README.md), the hosted
 Mixpanel-style product analytics platform. Kotlin, minSdk 21, zero third-party
 runtime dependencies (JSON via the platform's `org.json`, networking via
 `HttpURLConnection`).
@@ -54,11 +54,9 @@ import com.cohorly.android.Cohorly
 import org.json.JSONObject
 
 // Initialize once, e.g. in Application.onCreate(). One instance per project token.
-val cohorly = Cohorly.getInstance(
-    context,
-    "YOUR_PROJECT_TOKEN",          // Cohorly project token
-    "https://analytics.example.com" // your Cohorly server (events POST to {apiHost}/track)
-)
+// apiHost defaults to the hosted Cohorly API; pass a third argument to target a
+// different deployment.
+val cohorly = Cohorly.getInstance(context, "YOUR_PROJECT_TOKEN")
 
 // Track events
 cohorly.track("Signed Up")
@@ -168,7 +166,7 @@ Retry contract (shared across all Cohorly SDKs):
 
 ## Divergences from mixpanel-android
 
-- `apiHost` is required (self-hosted server), no mixpanel ingestion URL.
+- `apiHost` is optional; it defaults to the hosted Cohorly API (no mixpanel ingestion URL).
 - Flush interval defaults to 5s (mixpanel: 60s) - matches the Cohorly siblings.
 - `identify()` sends `/alias` linking the anonymous id when still anonymous
   (mixpanel-android's identify doesn't alias; the Cohorly JS core does).

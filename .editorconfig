@@ -1,0 +1,12 @@
+# ktlint reads .editorconfig. Kept lenient for an initial green baseline;
+# tighten (re-enable disabled rules) once the existing sources are formatted.
+root = true
+
+[*.{kt,kts}]
+indent_size = 4
+indent_style = space
+max_line_length = 120
+ktlint_code_style = intellij_idea
+ktlint_standard_no-wildcard-imports = disabled
+ktlint_standard_filename = disabled
+ktlint_standard_function-naming = disabled
