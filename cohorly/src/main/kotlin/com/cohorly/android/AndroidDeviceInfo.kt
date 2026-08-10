@@ -25,7 +25,7 @@ import com.cohorly.android.core.DeviceInfoProvider
 class AndroidDeviceInfo(private val context: Context) : DeviceInfoProvider {
     companion object {
         /** SDK version, sent as `$lib_version` on every event. */
-        const val LIB_VERSION = "0.1.0"
+        const val LIB_VERSION = "0.2.0"
     }
 
     /** Properties that cannot change during the process lifetime. */
@@ -41,6 +41,32 @@ class AndroidDeviceInfo(private val context: Context) : DeviceInfoProvider {
     }
 
     override fun appVersion(): String? = cachedAppVersion
+
+    /**
+     * Default profile properties mirroring the `$android_*` set mixpanel-android
+     * merges into every people update. Only derivable keys are included (app
+     * version/code omitted when PackageInfo is unavailable).
+     */
+    override fun profileProperties(): Map<String, Any?> = cachedProfileProperties
+
+    private val cachedProfileProperties: Map<String, Any?> = buildProfileProperties()
+
+    private fun buildProfileProperties(): Map<String, Any?> {
+        val props = LinkedHashMap<String, Any?>()
+        props["\$android_lib_version"] = LIB_VERSION
+        props["\$android_os"] = "Android"
+        props["\$android_os_version"] = Build.VERSION.RELEASE ?: "UNKNOWN"
+        props["\$android_manufacturer"] = Build.MANUFACTURER
+        props["\$android_brand"] = Build.BRAND
+        props["\$android_model"] = Build.MODEL
+        packageInfoOrNull()?.let { info ->
+            info.versionName?.let { props["\$android_app_version"] = it }
+            @Suppress("DEPRECATION")
+            props["\$android_app_version_code"] =
+                if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
+        }
+        return props
+    }
 
     private fun buildStaticProperties(): Map<String, Any?> {
         val props = LinkedHashMap<String, Any?>()

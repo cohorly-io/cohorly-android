@@ -117,9 +117,12 @@ class AutomaticEventsTest {
             72,
             sessions[0].getJSONObject("properties").getInt("\$ae_session_length"),
         )
+        // A single engage op carries both increments.
         val increments = transport.engagePayloads().filter { it.has("\$add") }
         assertEquals(1, increments.size)
-        assertEquals(1, increments[0].getJSONObject("\$add").getInt("\$ae_total_app_sessions"))
+        val add = increments[0].getJSONObject("\$add")
+        assertEquals(1, add.getInt("\$ae_total_app_sessions"))
+        assertEquals(72, add.getInt("\$ae_total_app_session_length"))
     }
 
     @Test

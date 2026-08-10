@@ -4,7 +4,10 @@ import android.app.Application
 import android.content.Context
 import com.cohorly.android.core.CohorlyConfig
 import com.cohorly.android.core.CohorlyCore
+import com.cohorly.android.core.CohorlyFlagsFetcher
 import com.cohorly.android.core.CohorlyTransport
+import com.cohorly.android.core.FlagResult
+import com.cohorly.android.core.HttpUrlConnectionFlagsFetcher
 import com.cohorly.android.core.HttpUrlConnectionTransport
 import org.json.JSONObject
 import java.util.concurrent.Executors
@@ -23,10 +26,7 @@ import java.util.concurrent.TimeUnit
  * One instance per project token (like mixpanel-android). All work runs on a
  * single background thread; every public method returns immediately.
  */
-class Cohorly private constructor(
-    private val core: CohorlyCore,
-    private val executor: ScheduledExecutorService,
-) {
+class Cohorly private constructor(private val core: CohorlyCore, private val executor: ScheduledExecutorService) {
     private val batchSize = core.config.batchSize.coerceIn(1, CohorlyCore.SERVER_MAX_BATCH)
 
     val people: People = People()
@@ -54,6 +54,7 @@ class Cohorly private constructor(
             apiHost: String = DEFAULT_API_HOST,
             config: CohorlyConfig = CohorlyConfig(),
             transport: CohorlyTransport = HttpUrlConnectionTransport(),
+            flagsFetcher: CohorlyFlagsFetcher = HttpUrlConnectionFlagsFetcher(),
         ): Cohorly {
             synchronized(instances) {
                 instances[token]?.let { return it }
@@ -65,6 +66,7 @@ class Cohorly private constructor(
                     storage = SharedPreferencesStorage(app, token),
                     transport = transport,
                     deviceInfo = AndroidDeviceInfo(app),
+                    flagsFetcher = flagsFetcher,
                     config = config,
                 )
                 val executor = Executors.newSingleThreadScheduledExecutor { runnable ->
@@ -79,6 +81,11 @@ class Cohorly private constructor(
                     )
                 }
                 val instance = Cohorly(core, executor)
+                // First flag evaluation for the persisted identity, off the
+                // caller's thread. Fire and forget - failures keep the cache.
+                if (config.loadFeatureFlags) {
+                    executor.execute { core.reloadFeatureFlags() }
+                }
                 (app as? Application)?.registerActivityLifecycleCallbacks(
                     LifecycleWatcher(
                         onForeground = { executor.execute { core.onAppForegrounded() } },
@@ -97,15 +104,13 @@ class Cohorly private constructor(
 
         /** Convenience overload mirroring mixpanel's trackAutomaticEvents flag. */
         @JvmStatic
-        fun getInstance(
-            context: Context,
-            token: String,
-            apiHost: String,
-            trackAutomaticEvents: Boolean,
-        ): Cohorly = getInstance(
-            context, token, apiHost,
-            CohorlyConfig(trackAutomaticEvents = trackAutomaticEvents),
-        )
+        fun getInstance(context: Context, token: String, apiHost: String, trackAutomaticEvents: Boolean): Cohorly =
+            getInstance(
+                context,
+                token,
+                apiHost,
+                CohorlyConfig(trackAutomaticEvents = trackAutomaticEvents),
+            )
     }
 
     // MARK: track
@@ -134,6 +139,27 @@ class Cohorly private constructor(
         }
     }
 
+    // MARK: timed events
+
+    /**
+     * Starts timing [eventName]; the next [track] of the same name attaches a
+     * `$duration` property (elapsed seconds, 3 decimals). Order is preserved by
+     * the single worker thread, so a `timeEvent` then `track` pair is reliable.
+     */
+    fun timeEvent(eventName: String) {
+        executor.execute { core.timeEvent(eventName) }
+    }
+
+    /** Cancels a pending [timeEvent] timer for [eventName]. */
+    fun clearTimedEvent(eventName: String) {
+        executor.execute { core.clearTimedEvent(eventName) }
+    }
+
+    /** Cancels all pending [timeEvent] timers. */
+    fun clearTimedEvents() {
+        executor.execute { core.clearTimedEvents() }
+    }
+
     // MARK: identity
 
     /**
@@ -142,12 +168,20 @@ class Cohorly private constructor(
      * Cohorly JS core SDK; note mixpanel-android's identify does not alias).
      */
     fun identify(distinctId: String) {
+        val wasDifferent = core.getDistinctId() != distinctId
         val alias = core.setIdentity(distinctId)
         if (alias != null) executor.execute { core.sendAlias(alias) }
+        // Flags are per-identity: refresh them for the new id on the worker.
+        if (wasDifferent && core.getDistinctId() == distinctId) {
+            executor.execute { core.reloadFeatureFlags() }
+        }
     }
 
     /** Current distinct id (anonymous uuid until [identify]). */
     fun getDistinctId(): String = core.getDistinctId()
+
+    /** Stable per-device id stamped as `$device_id` on every event. */
+    fun getDeviceId(): String = core.getDeviceId()
 
     /** True until [identify] assigns a real user id. */
     fun isAnonymous(): Boolean = core.isAnonymous()
@@ -156,6 +190,41 @@ class Cohorly private constructor(
     fun reset() {
         executor.execute { core.reset() }
     }
+
+    // MARK: feature flags
+
+    /**
+     * Re-evaluates feature flags for the current user on the worker thread.
+     * Returns immediately; subscribe with [onFeatureFlags] to be told when the
+     * new values landed. Failures are silent and keep the cached flags.
+     */
+    fun reloadFeatureFlags() {
+        executor.execute { core.reloadFeatureFlags() }
+    }
+
+    /**
+     * The flag's variant (String) when it has one, else its enabled Boolean.
+     * `false` for an unknown flag or before flags have loaded. Reads the cache,
+     * so it never blocks on the network.
+     */
+    fun getFeatureFlag(key: String): Any = core.getFeatureFlag(key)
+
+    /** Whether [key] is enabled. False for an unknown or unloaded flag. */
+    fun isFeatureEnabled(key: String): Boolean = core.isFeatureEnabled(key)
+
+    /** The JSON payload attached to [key], or null when it has none. */
+    fun getFeatureFlagPayload(key: String): Any? = core.getFeatureFlagPayload(key)
+
+    /** Every flag currently known for the active user. */
+    fun getFeatureFlags(): Map<String, FlagResult> = core.getFeatureFlags()
+
+    /**
+     * Subscribes to flag updates: fires after every successful reload, and
+     * immediately when flags are already loaded. Listeners run on the worker
+     * thread. Returns a function that removes the subscription.
+     */
+    fun onFeatureFlags(listener: (Map<String, FlagResult>) -> Unit): () -> Unit =
+        core.onFeatureFlags(listener)
 
     // MARK: super properties
 

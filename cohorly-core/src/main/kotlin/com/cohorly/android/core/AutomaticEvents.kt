@@ -16,7 +16,9 @@ import java.util.TimeZone
  *   from the current one (prop `$ae_updated_version`).
  * - `$ae_session`    - fired on the foreground -> background edge with
  *   `$ae_session_length` (seconds, integer) when the session ran >= 10s,
- *   plus `people.increment({$ae_total_app_sessions: 1})`.
+ *   plus a single `people.increment` bumping both
+ *   `$ae_total_app_sessions` (by 1) and `$ae_total_app_session_length`
+ *   (by the session's seconds).
  *
  * `$ae_crashed` is intentionally not implemented (no Cohorly sibling has it).
  * The clock is injected so session-length math is deterministic in tests.
@@ -82,8 +84,14 @@ internal class AutomaticEvents(
         val lengthMs = clock.nowMillis() - start
         if (lengthMs < MIN_SESSION_LENGTH_MS) return
 
-        core.track("\$ae_session", mapOf("\$ae_session_length" to (lengthMs / 1000).toInt()))
-        core.people.increment(mapOf("\$ae_total_app_sessions" to 1))
+        val lengthSec = (lengthMs / 1000).toInt()
+        core.track("\$ae_session", mapOf("\$ae_session_length" to lengthSec))
+        core.people.increment(
+            mapOf(
+                "\$ae_total_app_sessions" to 1,
+                "\$ae_total_app_session_length" to lengthSec,
+            ),
+        )
     }
 
     private fun iso8601(epochMs: Long): String {

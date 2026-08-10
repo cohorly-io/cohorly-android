@@ -25,10 +25,9 @@ class MockTransport : CohorlyTransport {
     fun trackedEvents(): List<JSONObject> =
         trackBatches().flatMap { batch -> (0 until batch.length()).map { batch.getJSONObject(it) } }
 
-    fun engagePayloads(): List<JSONObject> =
-        postsTo("/engage")
-            .map { JSONArray(it.body) }
-            .flatMap { batch -> (0 until batch.length()).map { batch.getJSONObject(it) } }
+    fun engagePayloads(): List<JSONObject> = postsTo("/engage")
+        .map { JSONArray(it.body) }
+        .flatMap { batch -> (0 until batch.length()).map { batch.getJSONObject(it) } }
 }
 
 class MockClock(var nowMs: Long = 1_000_000L) : CohorlyClock {
@@ -52,12 +51,33 @@ class StubDeviceInfo(
         "\$screen_width" to 1080,
     ),
     private val version: String? = "1.0.0",
+    private val profileProps: Map<String, Any?> = emptyMap(),
 ) : DeviceInfoProvider {
     override fun defaultProperties(): Map<String, Any?> = props
+    override fun profileProperties(): Map<String, Any?> = profileProps
     override fun appVersion(): String? = version
 }
 
 fun networkError(): Nothing = throw IOException("connection refused")
+
+/**
+ * Records every /flags/evaluate request body and replies with a programmable
+ * response (`null` simulates a failed evaluation).
+ */
+class MockFlagsFetcher(var response: String? = null) : CohorlyFlagsFetcher {
+    val requests = mutableListOf<String>()
+
+    /** Run inside [fetch] before returning, to mutate state "in flight". */
+    var beforeReturn: (() -> Unit)? = null
+
+    override fun fetch(url: String, body: String): String? {
+        requests.add(body)
+        beforeReturn?.invoke()
+        return response
+    }
+
+    fun requestedDistinctIds(): List<String> = requests.map { JSONObject(it).getString("distinct_id") }
+}
 
 /** Builds a core with sensible test defaults. */
 fun makeCore(
@@ -69,12 +89,14 @@ fun makeCore(
     token: String? = "test-token",
     jitter: () -> Double = { 0.0 },
     apiHost: String = "http://localhost:4000",
+    flagsFetcher: CohorlyFlagsFetcher = MockFlagsFetcher(),
 ): CohorlyCore = CohorlyCore(
     apiHost = apiHost,
     token = token,
     storage = storage,
     transport = transport,
     deviceInfo = deviceInfo,
+    flagsFetcher = flagsFetcher,
     clock = clock,
     config = config,
     jitterSource = jitter,

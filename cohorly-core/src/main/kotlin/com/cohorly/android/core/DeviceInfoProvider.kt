@@ -13,6 +13,14 @@ interface DeviceInfoProvider {
      */
     fun defaultProperties(): Map<String, Any?>
 
+    /**
+     * Default profile properties merged into every `people.set` / `setOnce`
+     * (lowest precedence - user-supplied keys win). The Android module supplies
+     * `$android_*` keys mirroring mixpanel-android; the default is empty so
+     * plain-JVM environments and tests add nothing. `null` values are skipped.
+     */
+    fun profileProperties(): Map<String, Any?> = emptyMap()
+
     /** Host app version, used for $ae_updated detection. */
     fun appVersion(): String?
 }

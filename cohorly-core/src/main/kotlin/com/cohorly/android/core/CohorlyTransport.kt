@@ -18,16 +18,12 @@ interface CohorlyTransport {
  * (delta-seconds form, per the server contract) when present, so the client
  * can honor the server's backoff hint on 429 / quota responses.
  */
-class CohorlyHttpException(
-    val status: Int,
-    val retryAfterMs: Long? = null,
-) : IOException("Cohorly: request failed with status $status")
+class CohorlyHttpException(val status: Int, val retryAfterMs: Long? = null) :
+    IOException("Cohorly: request failed with status $status")
 
 /** Default transport using HttpURLConnection (works on Android and plain JVM). */
-class HttpUrlConnectionTransport(
-    private val connectTimeoutMs: Int = 10_000,
-    private val readTimeoutMs: Int = 10_000,
-) : CohorlyTransport {
+class HttpUrlConnectionTransport(private val connectTimeoutMs: Int = 10_000, private val readTimeoutMs: Int = 10_000) :
+    CohorlyTransport {
     override fun post(url: String, body: String) {
         val connection = URL(url).openConnection() as HttpURLConnection
         try {

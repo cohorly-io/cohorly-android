@@ -5,6 +5,8 @@ Mixpanel-style product analytics platform. Kotlin, minSdk 21, zero third-party
 runtime dependencies (JSON via the platform's `org.json`, networking via
 `HttpURLConnection`).
 
+**Documentation:** [Android SDK reference](https://cohorly-docs.velloalabs.com/sdks/android) · [Quickstart](https://cohorly-docs.velloalabs.com/quickstart) · [HTTP API](https://cohorly-docs.velloalabs.com/api/ingestion)
+
 The API mirrors the Mixpanel Android SDK, so migrating is mostly a
 find-and-replace of `MixpanelAPI` -> `Cohorly` plus an `apiHost` argument.
 
@@ -72,12 +74,24 @@ cohorly.registerSuperPropertiesOnce(mapOf("first_referrer" to "newsletter"))
 cohorly.unregisterSuperProperty("ab_test")
 cohorly.clearSuperProperties()
 
-// User profiles (Cohorly /engage)
+// User profiles (Cohorly /engage). set/setOnce also merge default $android_*
+// profile properties (your keys win).
 cohorly.people.set("name", "Ada")
 cohorly.people.setOnce(mapOf("signup_date" to "2026-01-01"))
 cohorly.people.increment("logins", 1.0)
+// unset/deleteUser are destructive and refused by the server on the public
+// project token alone (they need an org-owner or superadmin Authorization
+// credential this SDK does not send) - server-side no-ops here; remove
+// profile data from the dashboard or the admin privacy API instead.
 cohorly.people.unset("legacy_prop")
 cohorly.people.deleteUser()
+
+// Timed events: measure duration between timeEvent() and the next track()
+cohorly.timeEvent("Image Upload")
+// ... work happens ...
+cohorly.track("Image Upload") // carries $duration (seconds, 3 decimals)
+cohorly.clearTimedEvent("Image Upload") // cancel a pending timer
+cohorly.clearTimedEvents()              // cancel all pending timers
 
 // Lifecycle
 cohorly.flush()          // send now (SDK also auto-flushes every 5s / 20 events)
@@ -112,6 +126,8 @@ per-call properties < reserved):
 | `distinct_id` | persistent anonymous uuid until `identify()` (reserved) |
 | `time` | unix ms (reserved) |
 | `$insert_id` | per-event uuid for dedup (reserved) |
+| `$device_id` | stable per-device uuid; survives `identify()` (reserved) |
+| `$user_id` | the distinct id, stamped only once identified (reserved) |
 | `$lib` | `"android"` (reserved) |
 | `token` | project token (reserved) |
 | `$lib_version` | SDK version |
@@ -131,6 +147,21 @@ Not collected: `$radio` (requires `READ_PHONE_STATE` on modern Android). Geo
 properties (`$city`, `$region`, `mp_country_code`) are derived server-side
 from the client IP.
 
+### Default profile properties
+
+Every `people.set` / `people.setOnce` also merges these `$android_*` defaults
+(mirroring mixpanel-android); user-supplied keys win. `people.increment` /
+`unset` / `deleteUser` are not affected.
+
+| Property | Value |
+| --- | --- |
+| `$android_lib_version` | SDK version |
+| `$android_os` | `"Android"` |
+| `$android_os_version` | `Build.VERSION.RELEASE` |
+| `$android_app_version` | `PackageInfo.versionName` (omitted when unavailable) |
+| `$android_app_version_code` | `PackageInfo.versionCode` (omitted when unavailable) |
+| `$android_manufacturer` / `$android_brand` / `$android_model` | `Build.*` |
+
 ## Automatic events
 
 With `trackAutomaticEvents = true` (default false, matching the Cohorly iOS
@@ -139,12 +170,29 @@ and React Native SDKs):
 - `$ae_first_open` - once ever, plus profile `$ae_first_app_open_date`.
 - `$ae_updated` - when the app version changes, prop `$ae_updated_version`.
 - `$ae_session` - on app background when the foreground session lasted >= 10s,
-  prop `$ae_session_length` (seconds), plus profile increment
-  `$ae_total_app_sessions`.
+  prop `$ae_session_length` (seconds), plus a single profile increment bumping
+  `$ae_total_app_sessions` (by 1) and `$ae_total_app_session_length` (by the
+  session's seconds).
 
 Foreground/background detection uses `Application.ActivityLifecycleCallbacks`
 (no androidx dependency); configuration changes don't split sessions.
 `$ae_crashed` is not implemented (parity with the other Cohorly SDKs).
+
+## Feature flags
+
+Flags are evaluated on `getInstance` (opt out with
+`CohorlyConfig(loadFeatureFlags = false)`), on `identify()` and on `reset()`,
+always on the worker thread, and cached in SharedPreferences scoped by distinct
+id; reads never hit the network. A failed evaluation keeps the previous cache.
+
+- `isFeatureEnabled(key): Boolean` - false for unknown/unloaded flags.
+- `getFeatureFlag(key): Any` - the variant `String` when the flag serves one,
+  else its enabled `Boolean`.
+- `getFeatureFlagPayload(key): Any?`
+- `getFeatureFlags(): Map<String, FlagResult>`
+- `reloadFeatureFlags()` - re-evaluate for the current user (async, worker thread).
+- `onFeatureFlags(listener): () -> Unit` - fires after every successful reload
+  (and immediately when flags are already loaded); returns unsubscribe.
 
 ## Offline queue and retry behavior
 
@@ -173,7 +221,7 @@ Retry contract (shared across all Cohorly SDKs):
 - Persistence is SharedPreferences-JSON, not SQLite.
 - People API has no `append` / `union` / `remove` / `merge` (no server-side
   list ops), and `optOutTracking()` does not reset the distinct id.
-- No `timeEvent()`, no `$ae_crashed`, no in-app messaging/A-B remnants.
+- No `$ae_crashed`, no in-app messaging/A-B remnants.
 
 ## Project layout / tests
 
@@ -187,3 +235,35 @@ Retry contract (shared across all Cohorly SDKs):
 ./gradlew test              # JVM unit tests
 ./gradlew :cohorly:assembleRelease  # build the AAR (requires Android SDK)
 ```
+
+## Publishing
+
+Not published to Maven Central - distributed via **JitPack**, which builds
+directly from the public `cohorly-io/cohorly-android` mirror on demand, no
+account/signing/namespace-verification needed. See
+[docs/RELEASING.md](../../docs/RELEASING.md#sdk-releases): bump `version` in
+this file's `build.gradle.kts`, then push an `android-vX.Y.Z` tag on the
+monorepo - `.github/workflows/sync-sdks.yml` mirrors this directory to
+`cohorly-io/cohorly-android`, tags it `vX.Y.Z`, and warms the JitPack build.
+`jitpack.yml` (this directory) pins JDK 17 to match the project's toolchain.
+
+Consumers add:
+
+```kotlin
+// settings.gradle.kts
+dependencyResolutionManagement {
+    repositories {
+        maven { url = uri("https://jitpack.io") }
+    }
+}
+
+// build.gradle.kts
+dependencies {
+    implementation("com.github.cohorly-io.cohorly-android:cohorly:vX.Y.Z")
+}
+```
+
+Once a release has actually gone through JitPack once (unverified here - no
+JitPack build has ever been triggered for this repo), `packages/sdk-react-native`'s
+native module can depend on it the same way instead of vendoring a copy of the
+device-info code - see that package's README.

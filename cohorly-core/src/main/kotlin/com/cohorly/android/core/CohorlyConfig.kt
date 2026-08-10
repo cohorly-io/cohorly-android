@@ -20,4 +20,16 @@ data class CohorlyConfig(
     val maxRetryDelayMs: Long = 600_000,
     /** Enables $ae_first_open / $ae_updated / $ae_session lifecycle events. */
     val trackAutomaticEvents: Boolean = false,
+    /**
+     * Evaluate feature flags on init (POST /flags/evaluate for the current
+     * distinct id, on the worker thread). Default true; set false to call
+     * `reloadFeatureFlags()` yourself. Mirrors sdk-react-native's option.
+     */
+    val loadFeatureFlags: Boolean = true,
+    /**
+     * Track `$feature_flag_called` the first time each flag value is read via
+     * `getFeatureFlag` / `isFeatureEnabled`. Default true; set false to opt out
+     * of client-side exposure events.
+     */
+    val sendExposureEvents: Boolean = true,
 )

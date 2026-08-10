@@ -9,10 +9,8 @@ import android.os.Bundle
  * (no androidx.lifecycle dependency). Configuration changes (rotation) do
  * not produce a background/foreground edge.
  */
-internal class LifecycleWatcher(
-    private val onForeground: () -> Unit,
-    private val onBackground: () -> Unit,
-) : Application.ActivityLifecycleCallbacks {
+internal class LifecycleWatcher(private val onForeground: () -> Unit, private val onBackground: () -> Unit) :
+    Application.ActivityLifecycleCallbacks {
     private var startedCount = 0
     private var changingConfigurations = false
 

@@ -30,6 +30,7 @@ class CohorlyCore(
     private val storage: CohorlyStorage,
     private val transport: CohorlyTransport,
     private val deviceInfo: DeviceInfoProvider = EmptyDeviceInfo(),
+    private val flagsFetcher: CohorlyFlagsFetcher = HttpUrlConnectionFlagsFetcher(),
     private val clock: CohorlyClock = SystemClock(),
     val config: CohorlyConfig = CohorlyConfig(),
     /** Jitter source in [-1, 1]; injectable for deterministic backoff tests. */
@@ -37,11 +38,18 @@ class CohorlyCore(
 ) {
     private object Keys {
         const val DISTINCT_ID = "cohorly.distinct_id"
+        const val DEVICE_ID = "cohorly.device_id"
         const val ANONYMOUS = "cohorly.anonymous"
         const val SUPER_PROPS = "cohorly.super_properties"
         const val EVENT_QUEUE = "cohorly.event_queue"
         const val ENGAGE_QUEUE = "cohorly.engage_queue"
         const val OPT_OUT = "cohorly.opt_out"
+
+        /**
+         * Feature-flag cache (mirrors sdk-core's `chl_flags`), scoped by
+         * distinct id so one user's flags are never served to another.
+         */
+        const val FLAGS = "cohorly.flags"
     }
 
     companion object {
@@ -60,11 +68,15 @@ class CohorlyCore(
     private val batchSize: Int = config.batchSize.coerceIn(1, SERVER_MAX_BATCH)
 
     private var distinctId: String
+    private var deviceId: String
     private var anonymous: Boolean
     private var superProps: JSONObject
     private val eventQueue = ArrayDeque<JSONObject>()
     private val engageQueue = ArrayDeque<JSONObject>()
     private var optedOut: Boolean
+
+    /** Event name -> start instant (ms) for timed events; in-memory only. */
+    private val timedEvents = HashMap<String, Long>()
 
     /** Consecutive /track flush failures; drives backoff. Reset on success. */
     private var consecutiveFailures = 0
@@ -82,6 +94,26 @@ class CohorlyCore(
 
     private val automaticEvents: AutomaticEvents?
 
+    /** Last known flag results for the current distinct id. */
+    private var flags: Map<String, FlagResult> = emptyMap()
+
+    /** True once flags were loaded, from the persisted cache or a reload. */
+    private var flagsLoaded = false
+
+    /** Bumped per reload; a response carrying an older value is stale. */
+    private var flagRequestSeq = 0L
+
+    /** Bumped per subscription, keys [flagListeners] for unsubscribe. */
+    private var flagListenerSeq = 0L
+    private val flagListeners = LinkedHashMap<Long, (Map<String, FlagResult>) -> Unit>()
+
+    /**
+     * `"<key>:<value>"` pairs already reported as `$feature_flag_called` for
+     * the current identity. In-memory only (never persisted) and cleared by
+     * [setIdentity]/[reset], so a new identity re-reports its exposures once.
+     */
+    private val reportedExposures = HashSet<String>()
+
     val people: People = People()
 
     init {
@@ -95,6 +127,16 @@ class CohorlyCore(
             storage.set(Keys.DISTINCT_ID, distinctId)
             storage.set(Keys.ANONYMOUS, "1")
         }
+        // Device id: persisted separately so it survives identify(). On a fresh
+        // install it equals the anon distinct id (Mixpanel's `$device:<uuid>`
+        // convention); older installs migrating in mint a fresh one.
+        val storedDeviceId = storage.get(Keys.DEVICE_ID)
+        if (storedDeviceId != null) {
+            deviceId = storedDeviceId
+        } else {
+            deviceId = if (anonymous) distinctId else UUID.randomUUID().toString()
+            storage.set(Keys.DEVICE_ID, deviceId)
+        }
         optedOut = storage.get(Keys.OPT_OUT) == "1"
         superProps = readJsonObject(Keys.SUPER_PROPS)
         readJsonArrayInto(Keys.EVENT_QUEUE, eventQueue)
@@ -103,6 +145,31 @@ class CohorlyCore(
         if (enforceEventQueueCap()) persistEventQueue()
 
         effectiveBatchSize = batchSize
+
+        // Feature-flag cache: served only when it belongs to the current
+        // distinct id; another identity's cache is dropped, never served.
+        val cache = storage.get(Keys.FLAGS)?.let { raw ->
+            try {
+                JSONObject(raw)
+            } catch (_: Exception) {
+                null
+            }
+        }
+        if (cache != null) {
+            val parsed = if (cache.optString("distinct_id") == distinctId) {
+                parseFlagsResponse(cache.toString())
+            } else {
+                null
+            }
+            if (parsed != null) {
+                flags = parsed
+                flagsLoaded = true
+            } else {
+                // Another identity's cache, or an unparseable one: drop it
+                // rather than reporting flags as loaded-and-empty.
+                storage.set(Keys.FLAGS, null)
+            }
+        }
 
         automaticEvents = if (config.trackAutomaticEvents) {
             AutomaticEvents(this, storage, clock).also { it.start(deviceInfo.appVersion()) }
@@ -115,6 +182,9 @@ class CohorlyCore(
 
     fun getDistinctId(): String = synchronized(lock) { distinctId }
 
+    /** Stable per-device id stamped as `$device_id` on every event. */
+    fun getDeviceId(): String = synchronized(lock) { deviceId }
+
     fun isAnonymous(): Boolean = synchronized(lock) { anonymous }
 
     /**
@@ -124,8 +194,12 @@ class CohorlyCore(
      * [sendAlias] so the network hop runs on its background thread).
      */
     fun identify(newDistinctId: String) {
+        val wasDifferent = getDistinctId() != newDistinctId
         val alias = setIdentity(newDistinctId)
         if (alias != null) sendAlias(alias)
+        // Flags are per-identity: refresh them for the new id (best effort).
+        // Skipped when no switch happened (same id, or opted out).
+        if (wasDifferent && getDistinctId() == newDistinctId) reloadFeatureFlags()
     }
 
     /**
@@ -146,6 +220,8 @@ class CohorlyCore(
         anonymous = false
         storage.set(Keys.DISTINCT_ID, distinctId)
         storage.set(Keys.ANONYMOUS, "0")
+        // Exposures are per-identity: the new user must report its own.
+        reportedExposures.clear()
         aliasPayload
     }
 
@@ -165,16 +241,179 @@ class CohorlyCore(
     fun reset() {
         synchronized(lock) {
             distinctId = UUID.randomUUID().toString()
+            deviceId = distinctId
             anonymous = true
             superProps = JSONObject()
             eventQueue.clear()
             engageQueue.clear()
+            timedEvents.clear()
             storage.set(Keys.DISTINCT_ID, distinctId)
+            storage.set(Keys.DEVICE_ID, deviceId)
             storage.set(Keys.ANONYMOUS, "1")
             persistSuperProps()
             persistEventQueue()
             persistEngageQueue()
+            // Flags are per-identity: the previous identity's flags must never
+            // be served to the fresh anonymous id, so drop them (memory and
+            // storage) BEFORE asking the server for this id's flags.
+            flags = emptyMap()
+            flagsLoaded = false
+            flagRequestSeq += 1
+            storage.set(Keys.FLAGS, null)
+            reportedExposures.clear()
         }
+        reloadFeatureFlags()
+    }
+
+    // MARK: feature flags
+
+    /**
+     * Re-evaluates feature flags for the current distinct id via
+     * `POST {apiHost}/flags/evaluate`, caching the result in memory and in
+     * [storage] (scoped by distinct id). Blocking, like [flush]: the Android
+     * wrapper runs it on its worker thread.
+     *
+     * Never throws and never clears the cache on failure - a network error, a
+     * non-2xx response or an unparseable body simply leaves the previously
+     * known flags in place. Results are discarded when the identity changed,
+     * or a newer reload started, while the request was in flight.
+     */
+    fun reloadFeatureFlags() {
+        val (requestedId, seq) = synchronized(lock) {
+            flagRequestSeq += 1
+            distinctId to flagRequestSeq
+        }
+        val body = JSONObject().put("distinct_id", requestedId)
+        if (token != null) body.put("token", token)
+        val raw = try {
+            flagsFetcher.fetch("$apiHost/flags/evaluate", body.toString())
+        } catch (_: Exception) {
+            null
+        }
+        val parsed = parseFlagsResponse(raw) ?: return
+
+        val listeners = synchronized(lock) {
+            // Identity changed, or a newer reload started, while this request
+            // was in flight: these results are stale, discard them.
+            if (requestedId != distinctId || seq != flagRequestSeq) return
+            flags = parsed
+            flagsLoaded = true
+            persistFlags(requestedId)
+            flagListeners.values.toList()
+        }
+        for (listener in listeners) {
+            try {
+                listener(parsed)
+            } catch (_: Exception) {
+                // A listener must not break the reload for the others.
+            }
+        }
+    }
+
+    /**
+     * The flag's variant when it has one, else its enabled boolean. `false`
+     * for an unknown flag or before flags have loaded.
+     *
+     * Reading a *known* flag also tracks `$feature_flag_called` once per
+     * distinct value, per identity (see [exposureFor]).
+     */
+    fun getFeatureFlag(key: String): Any {
+        val value: Any
+        val exposure: Any?
+        synchronized(lock) {
+            val flag = flags[key] ?: return false
+            value = flag.variant ?: flag.enabled
+            exposure = exposureFor(key, flag)
+        }
+        trackExposure(key, exposure)
+        return value
+    }
+
+    /**
+     * Whether [key] is enabled. False for an unknown or unloaded flag. Reports
+     * an exposure on the same terms as [getFeatureFlag].
+     */
+    fun isFeatureEnabled(key: String): Boolean {
+        val enabled: Boolean
+        val exposure: Any?
+        synchronized(lock) {
+            val flag = flags[key] ?: return false
+            enabled = flag.enabled
+            exposure = exposureFor(key, flag)
+        }
+        trackExposure(key, exposure)
+        return enabled
+    }
+
+    /**
+     * Marks [key] as exposed and returns the `$feature_flag_response` value to
+     * report, or null when nothing should be tracked (exposure events off, or
+     * this key/value pair was already reported for the current identity).
+     *
+     * Must be called while holding [lock].
+     */
+    private fun exposureFor(key: String, flag: FlagResult): Any? {
+        if (!config.sendExposureEvents) return null
+        if (!reportedExposures.add("$key:${flag.variant ?: flag.enabled}")) return null
+        return flag.variant ?: flag.enabled
+    }
+
+    /**
+     * Queues the exposure event. Called OUTSIDE [lock] (right after the block
+     * that decided it) so the ordering stays lock -> track, never track ->
+     * lock, even though Kotlin's `synchronized` would tolerate the nesting.
+     */
+    private fun trackExposure(key: String, response: Any?) {
+        if (response == null) return
+        track(
+            "\$feature_flag_called",
+            mapOf("\$feature_flag" to key, "\$feature_flag_response" to response),
+        )
+    }
+
+    /** The JSON payload attached to [key], or null when it has none. */
+    fun getFeatureFlagPayload(key: String): Any? = synchronized(lock) { flags[key]?.payload }
+
+    /** Every flag currently known for the active distinct id. */
+    fun getFeatureFlags(): Map<String, FlagResult> = synchronized(lock) { LinkedHashMap(flags) }
+
+    /**
+     * Subscribes to flag updates. [listener] fires after every successful
+     * reload, and immediately when flags are already loaded. Returns a function
+     * that removes the subscription.
+     */
+    fun onFeatureFlags(listener: (Map<String, FlagResult>) -> Unit): () -> Unit {
+        val (id, loaded) = synchronized(lock) {
+            flagListenerSeq += 1
+            flagListeners[flagListenerSeq] = listener
+            flagListenerSeq to (if (flagsLoaded) flags else null)
+        }
+        if (loaded != null) {
+            try {
+                listener(loaded)
+            } catch (_: Exception) {
+            }
+        }
+        return { synchronized(lock) { flagListeners.remove(id) } }
+    }
+
+    /** Must be called while holding [lock]. */
+    private fun persistFlags(forDistinctId: String) {
+        val serialized = JSONObject()
+        for ((key, flag) in flags) {
+            serialized.put(
+                key,
+                JSONObject()
+                    .put("enabled", flag.enabled)
+                    .put("variant", flag.variant ?: JSONObject.NULL)
+                    .put("payload", flag.payload ?: JSONObject.NULL)
+                    .put("reason", flag.reason),
+            )
+        }
+        storage.set(
+            Keys.FLAGS,
+            JSONObject().put("distinct_id", forDistinctId).put("flags", serialized).toString(),
+        )
     }
 
     // MARK: super properties
@@ -245,13 +484,14 @@ class CohorlyCore(
 
     fun track(event: String) = track(event, null as Map<String, Any?>?)
 
-    fun track(event: String, properties: JSONObject?) =
-        track(event, properties?.let { toMap(it) })
+    fun track(event: String, properties: JSONObject?) = track(event, properties?.let { toMap(it) })
 
     /**
      * Queues an event. Property precedence (lowest to highest): device
      * defaults < super properties < [properties] < reserved (`distinct_id`,
-     * `time`, `$insert_id`, `$lib`, `token`).
+     * `time`, `$insert_id`, `$lib`, `token`). `$device_id` (always) and
+     * `$user_id` (only when identified) are stamped last but never override a
+     * value the caller passed explicitly in [properties].
      */
     fun track(event: String, properties: Map<String, Any?>?) {
         synchronized(lock) {
@@ -264,16 +504,46 @@ class CohorlyCore(
             if (properties != null) {
                 for ((key, value) in properties) props.put(key, wrap(value))
             }
+            val startMs = timedEvents.remove(event)
+            if (startMs != null) {
+                val durationSec = (clock.nowMillis() - startMs) / 1000.0
+                props.put("\$duration", roundTo3(durationSec))
+            }
             props.put("distinct_id", distinctId)
             props.put("time", clock.nowMillis())
             props.put("\$insert_id", UUID.randomUUID().toString())
             props.put("\$lib", LIB_NAME)
             if (token != null) props.put("token", token)
+            // Reserved identity fields, stamped last but never overriding a value
+            // the caller passed explicitly (mirrors Mixpanel's $device_id/$user_id).
+            if (!props.has("\$device_id")) props.put("\$device_id", deviceId)
+            if (!anonymous && !props.has("\$user_id")) props.put("\$user_id", distinctId)
 
             eventQueue.addLast(JSONObject().put("event", event).put("properties", props))
             enforceEventQueueCap()
             persistEventQueue()
         }
+    }
+
+    // MARK: timed events
+
+    /**
+     * Starts a timer for [event]. The next [track] of the same event name
+     * attaches `$duration` (elapsed seconds, rounded to 3 decimals) and clears
+     * the timer. A second [timeEvent] before that track restarts the timer.
+     */
+    fun timeEvent(event: String) {
+        synchronized(lock) { timedEvents[event] = clock.nowMillis() }
+    }
+
+    /** Cancels a pending timer so no `$duration` is attached. */
+    fun clearTimedEvent(event: String) {
+        synchronized(lock) { timedEvents.remove(event) }
+    }
+
+    /** Cancels all pending timers. */
+    fun clearTimedEvents() {
+        synchronized(lock) { timedEvents.clear() }
     }
 
     fun pendingEventCount(): Int = synchronized(lock) { eventQueue.size }
@@ -283,8 +553,9 @@ class CohorlyCore(
     // MARK: people
 
     inner class People internal constructor() {
-        fun set(properties: Map<String, Any?>) = engage { it.put("\$set", toJson(properties)) }
-        fun setOnce(properties: Map<String, Any?>) = engage { it.put("\$set_once", toJson(properties)) }
+        fun set(properties: Map<String, Any?>) = engage { it.put("\$set", toJson(withProfileDefaults(properties))) }
+        fun setOnce(properties: Map<String, Any?>) =
+            engage { it.put("\$set_once", toJson(withProfileDefaults(properties))) }
         fun increment(properties: Map<String, Any?>) = engage { it.put("\$add", toJson(properties)) }
         fun unset(keys: List<String>) = engage { it.put("\$unset", JSONArray(keys)) }
         fun deleteUser() = engage { it.put("\$delete", true) }
@@ -471,6 +742,25 @@ class CohorlyCore(
     }
 
     // MARK: JSON helpers
+
+    /**
+     * Merges the device provider's default profile properties under
+     * [properties] so user-supplied keys win. Only non-null defaults are added,
+     * and only keys the caller did not already provide.
+     */
+    private fun withProfileDefaults(properties: Map<String, Any?>): Map<String, Any?> {
+        val defaults = deviceInfo.profileProperties()
+        if (defaults.isEmpty()) return properties
+        val merged = LinkedHashMap<String, Any?>()
+        for ((key, value) in defaults) {
+            if (value != null && !properties.containsKey(key)) merged[key] = value
+        }
+        merged.putAll(properties)
+        return merged
+    }
+
+    /** Rounds a seconds value to 3 decimal places for `$duration`. */
+    private fun roundTo3(value: Double): Double = Math.round(value * 1000.0) / 1000.0
 
     private fun wrap(value: Any?): Any = JSONObject.wrap(value) ?: JSONObject.NULL
 
