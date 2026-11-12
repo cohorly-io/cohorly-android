@@ -1,0 +1,31 @@
+{
+  "event": "$exception",
+  "properties": {
+    "distinct_id": "spike-user-42",
+    "time": 1794409380364,
+    "$insert_id": "8644bec4-ab5d-3164-85d2-e776ced8970b",
+    "$lib": "android",
+    "$lib_version": "0.0.0-spike",
+    "$device_id": "b6247659-69a5-46fd-ad0d-a667283607b6",
+    "$os": "Android",
+    "$os_version": "16",
+    "$model": "sdk_gphone64_arm64",
+    "$manufacturer": "Google",
+    "$app_version_string": "0.1.0",
+    "$app_build_number": "11",
+    "$exception_release": "android@0.1.0+11",
+    "$exception_dist": "5f3c2a10-8e4b-4c7d-9a61-0b2e7d4f9c13",
+    "$exception_level": "warning",
+    "$exception_list": [
+      {
+        "type": "LowMemoryKill",
+        "value": "killed by lmkd (importance=100, pss=0kB, rss=1726472kB)",
+        "mechanism": {
+          "handled": false,
+          "type": "exit_info",
+          "synthetic": false
+        }
+      }
+    ]
+  }
+}

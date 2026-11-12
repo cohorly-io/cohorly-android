@@ -11,6 +11,16 @@ import java.net.URL
  */
 interface CohorlyTransport {
     fun post(url: String, body: String)
+
+    /**
+     * Same as [post], with extra request headers. The crash reporter sends its
+     * reports with `X-Cohorly-Token`, since a pending report is a bare event.
+     * The default drops [headers], so a custom transport that needs them must
+     * override this.
+     */
+    fun post(url: String, body: String, headers: Map<String, String>) {
+        post(url, body)
+    }
 }
 
 /**
@@ -25,6 +35,10 @@ class CohorlyHttpException(val status: Int, val retryAfterMs: Long? = null) :
 class HttpUrlConnectionTransport(private val connectTimeoutMs: Int = 10_000, private val readTimeoutMs: Int = 10_000) :
     CohorlyTransport {
     override fun post(url: String, body: String) {
+        post(url, body, emptyMap())
+    }
+
+    override fun post(url: String, body: String, headers: Map<String, String>) {
         val connection = URL(url).openConnection() as HttpURLConnection
         try {
             connection.requestMethod = "POST"
@@ -32,6 +46,7 @@ class HttpUrlConnectionTransport(private val connectTimeoutMs: Int = 10_000, pri
             connection.connectTimeout = connectTimeoutMs
             connection.readTimeout = readTimeoutMs
             connection.setRequestProperty("Content-Type", "application/json")
+            for ((name, value) in headers) connection.setRequestProperty(name, value)
             connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
 
             val status = connection.responseCode

@@ -1,0 +1,1055 @@
+{
+  "event": "$exception",
+  "properties": {
+    "distinct_id": "spike-user-42",
+    "time": 1794408031706,
+    "$insert_id": "50dbfc67-b87e-45e0-8195-fe809c2499d4",
+    "$lib": "android",
+    "$lib_version": "0.0.0-spike",
+    "$device_id": "b6247659-69a5-46fd-ad0d-a667283607b6",
+    "$user_id": "spike-user-42",
+    "$os": "Android",
+    "$os_version": "16",
+    "$model": "sdk_gphone64_arm64",
+    "$manufacturer": "Google",
+    "$app_version_string": "0.1.0",
+    "$app_build_number": "7",
+    "$exception_release": "android@0.1.0+7",
+    "$exception_dist": "5f3c2a10-8e4b-4c7d-9a61-0b2e7d4f9c13",
+    "$exception_list": [
+      {
+        "type": "java.lang.IllegalStateException",
+        "value": "Checkout failed for cart 42",
+        "mechanism": {
+          "handled": false,
+          "type": "uncaught_exception",
+          "synthetic": false
+        },
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "java",
+              "module": "com.android.internal.os.ZygoteInit",
+              "function": "main",
+              "filename": "ZygoteInit.java",
+              "lineno": 929,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "com.android.internal.os.RuntimeInit$MethodAndArgsCaller",
+              "function": "run",
+              "filename": "RuntimeInit.java",
+              "lineno": 566,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.reflect.Method",
+              "function": "invoke",
+              "filename": "Method.java",
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.app.ActivityThread",
+              "function": "main",
+              "filename": "ActivityThread.java",
+              "lineno": 9287,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.Looper",
+              "function": "loop",
+              "filename": "Looper.java",
+              "lineno": 367,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.Looper",
+              "function": "loopOnce",
+              "filename": "Looper.java",
+              "lineno": 263,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.Looper",
+              "function": "dispatchMessage",
+              "filename": "Looper.java",
+              "lineno": 333,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.Handler",
+              "function": "dispatchMessage",
+              "filename": "Handler.java",
+              "lineno": 125,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.Handler",
+              "function": "handleCallback",
+              "filename": "Handler.java",
+              "lineno": 1070,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.view.View$PerformClick",
+              "function": "run",
+              "filename": "View.java",
+              "lineno": 31919,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.view.View",
+              "function": "-$$Nest$mperformClickInternal",
+              "lineno": 0,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.view.View",
+              "function": "performClickInternal",
+              "filename": "View.java",
+              "lineno": 8181,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.view.View",
+              "function": "performClick",
+              "filename": "View.java",
+              "lineno": 8204,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.MainActivity$$ExternalSyntheticLambda3",
+              "function": "onClick",
+              "filename": "D8$$SyntheticClass",
+              "lineno": 0,
+              "in_app": true
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.MainActivity",
+              "function": "$r8$lambda$Ko6MuBcBLnzARZaAx0mDXnOr-kQ",
+              "lineno": 0,
+              "in_app": true
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.MainActivity",
+              "function": "onCreate$button$lambda$3$lambda$2",
+              "filename": "MainActivity.kt",
+              "lineno": 24,
+              "in_app": true
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.MainActivity$$ExternalSyntheticLambda8",
+              "function": "invoke",
+              "filename": "D8$$SyntheticClass",
+              "lineno": 0,
+              "in_app": true
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.MainActivity",
+              "function": "$r8$lambda$qhERm4AY4Vk_VuM6j09H7yMR1Js",
+              "lineno": 0,
+              "in_app": true
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.MainActivity",
+              "function": "onCreate$lambda$7",
+              "filename": "MainActivity.kt",
+              "lineno": 39,
+              "in_app": true
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.CheckoutService",
+              "function": "pay",
+              "filename": "SpikeApp.kt",
+              "lineno": 67,
+              "in_app": true
+            }
+          ]
+        }
+      },
+      {
+        "type": "java.io.IOException",
+        "value": "payment gateway unreachable",
+        "mechanism": {
+          "handled": false,
+          "type": "uncaught_exception",
+          "synthetic": false
+        },
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "java",
+              "module": "com.android.internal.os.ZygoteInit",
+              "function": "main",
+              "filename": "ZygoteInit.java",
+              "lineno": 929,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "com.android.internal.os.RuntimeInit$MethodAndArgsCaller",
+              "function": "run",
+              "filename": "RuntimeInit.java",
+              "lineno": 566,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.reflect.Method",
+              "function": "invoke",
+              "filename": "Method.java",
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.app.ActivityThread",
+              "function": "main",
+              "filename": "ActivityThread.java",
+              "lineno": 9287,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.Looper",
+              "function": "loop",
+              "filename": "Looper.java",
+              "lineno": 367,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.Looper",
+              "function": "loopOnce",
+              "filename": "Looper.java",
+              "lineno": 263,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.Looper",
+              "function": "dispatchMessage",
+              "filename": "Looper.java",
+              "lineno": 333,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.Handler",
+              "function": "dispatchMessage",
+              "filename": "Handler.java",
+              "lineno": 125,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.Handler",
+              "function": "handleCallback",
+              "filename": "Handler.java",
+              "lineno": 1070,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.view.View$PerformClick",
+              "function": "run",
+              "filename": "View.java",
+              "lineno": 31919,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.view.View",
+              "function": "-$$Nest$mperformClickInternal",
+              "lineno": 0,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.view.View",
+              "function": "performClickInternal",
+              "filename": "View.java",
+              "lineno": 8181,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.view.View",
+              "function": "performClick",
+              "filename": "View.java",
+              "lineno": 8204,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.MainActivity$$ExternalSyntheticLambda3",
+              "function": "onClick",
+              "filename": "D8$$SyntheticClass",
+              "lineno": 0,
+              "in_app": true
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.MainActivity",
+              "function": "$r8$lambda$Ko6MuBcBLnzARZaAx0mDXnOr-kQ",
+              "lineno": 0,
+              "in_app": true
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.MainActivity",
+              "function": "onCreate$button$lambda$3$lambda$2",
+              "filename": "MainActivity.kt",
+              "lineno": 24,
+              "in_app": true
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.MainActivity$$ExternalSyntheticLambda8",
+              "function": "invoke",
+              "filename": "D8$$SyntheticClass",
+              "lineno": 0,
+              "in_app": true
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.MainActivity",
+              "function": "$r8$lambda$qhERm4AY4Vk_VuM6j09H7yMR1Js",
+              "lineno": 0,
+              "in_app": true
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.MainActivity",
+              "function": "onCreate$lambda$7",
+              "filename": "MainActivity.kt",
+              "lineno": 39,
+              "in_app": true
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.CheckoutService",
+              "function": "pay",
+              "filename": "SpikeApp.kt",
+              "lineno": 65,
+              "in_app": true
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.CheckoutService$Gateway",
+              "function": "charge",
+              "filename": "SpikeApp.kt",
+              "lineno": 76,
+              "in_app": true
+            }
+          ]
+        }
+      },
+      {
+        "type": "java.net.SocketTimeoutException",
+        "value": "connect timed out after 10000ms (cart 42)",
+        "mechanism": {
+          "handled": false,
+          "type": "uncaught_exception",
+          "synthetic": false
+        },
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "java",
+              "module": "com.android.internal.os.ZygoteInit",
+              "function": "main",
+              "filename": "ZygoteInit.java",
+              "lineno": 929,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "com.android.internal.os.RuntimeInit$MethodAndArgsCaller",
+              "function": "run",
+              "filename": "RuntimeInit.java",
+              "lineno": 566,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.reflect.Method",
+              "function": "invoke",
+              "filename": "Method.java",
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.app.ActivityThread",
+              "function": "main",
+              "filename": "ActivityThread.java",
+              "lineno": 9287,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.Looper",
+              "function": "loop",
+              "filename": "Looper.java",
+              "lineno": 367,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.Looper",
+              "function": "loopOnce",
+              "filename": "Looper.java",
+              "lineno": 263,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.Looper",
+              "function": "dispatchMessage",
+              "filename": "Looper.java",
+              "lineno": 333,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.Handler",
+              "function": "dispatchMessage",
+              "filename": "Handler.java",
+              "lineno": 125,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.Handler",
+              "function": "handleCallback",
+              "filename": "Handler.java",
+              "lineno": 1070,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.view.View$PerformClick",
+              "function": "run",
+              "filename": "View.java",
+              "lineno": 31919,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.view.View",
+              "function": "-$$Nest$mperformClickInternal",
+              "lineno": 0,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.view.View",
+              "function": "performClickInternal",
+              "filename": "View.java",
+              "lineno": 8181,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.view.View",
+              "function": "performClick",
+              "filename": "View.java",
+              "lineno": 8204,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.MainActivity$$ExternalSyntheticLambda3",
+              "function": "onClick",
+              "filename": "D8$$SyntheticClass",
+              "lineno": 0,
+              "in_app": true
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.MainActivity",
+              "function": "$r8$lambda$Ko6MuBcBLnzARZaAx0mDXnOr-kQ",
+              "lineno": 0,
+              "in_app": true
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.MainActivity",
+              "function": "onCreate$button$lambda$3$lambda$2",
+              "filename": "MainActivity.kt",
+              "lineno": 24,
+              "in_app": true
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.MainActivity$$ExternalSyntheticLambda8",
+              "function": "invoke",
+              "filename": "D8$$SyntheticClass",
+              "lineno": 0,
+              "in_app": true
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.MainActivity",
+              "function": "$r8$lambda$qhERm4AY4Vk_VuM6j09H7yMR1Js",
+              "lineno": 0,
+              "in_app": true
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.MainActivity",
+              "function": "onCreate$lambda$7",
+              "filename": "MainActivity.kt",
+              "lineno": 39,
+              "in_app": true
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.CheckoutService",
+              "function": "pay",
+              "filename": "SpikeApp.kt",
+              "lineno": 65,
+              "in_app": true
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.CheckoutService$Gateway",
+              "function": "charge",
+              "filename": "SpikeApp.kt",
+              "lineno": 74,
+              "in_app": true
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.CheckoutService$Gateway",
+              "function": "connect",
+              "filename": "SpikeApp.kt",
+              "lineno": 80,
+              "in_app": true
+            }
+          ]
+        }
+      }
+    ],
+    "$exception_level": "fatal",
+    "$exception_threads": [
+      {
+        "id": 47,
+        "name": "Jit thread pool worker thread 0",
+        "stacktrace": {
+          "type": "raw",
+          "frames": []
+        }
+      },
+      {
+        "id": 48,
+        "name": "HeapTaskDaemon",
+        "stacktrace": {
+          "type": "raw",
+          "frames": []
+        }
+      },
+      {
+        "id": 59,
+        "name": "hwuiTask0",
+        "stacktrace": {
+          "type": "raw",
+          "frames": []
+        }
+      },
+      {
+        "id": 49,
+        "name": "ReferenceQueueDaemon",
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "java",
+              "module": "java.lang.Thread",
+              "function": "run",
+              "filename": "Thread.java",
+              "lineno": 1563,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Daemons$Daemon",
+              "function": "run",
+              "filename": "Daemons.java",
+              "lineno": 135,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Daemons$ReferenceQueueDaemon",
+              "function": "runInternal",
+              "filename": "Daemons.java",
+              "lineno": 262,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Object",
+              "function": "wait",
+              "filename": "Object.java",
+              "lineno": 543,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Object",
+              "function": "wait",
+              "filename": "Object.java",
+              "lineno": 405,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Object",
+              "function": "wait",
+              "filename": "Object.java",
+              "in_app": false
+            }
+          ]
+        }
+      },
+      {
+        "id": 55,
+        "name": "SharedPreferences",
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "java",
+              "module": "java.lang.Thread",
+              "function": "run",
+              "filename": "Thread.java",
+              "lineno": 1563,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.util.concurrent.ThreadPoolExecutor$Worker",
+              "function": "run",
+              "filename": "ThreadPoolExecutor.java",
+              "lineno": 652,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.util.concurrent.ThreadPoolExecutor",
+              "function": "runWorker",
+              "filename": "ThreadPoolExecutor.java",
+              "lineno": 1140,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.util.concurrent.ThreadPoolExecutor",
+              "function": "getTask",
+              "filename": "ThreadPoolExecutor.java",
+              "lineno": 1079,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.util.concurrent.LinkedBlockingQueue",
+              "function": "poll",
+              "filename": "LinkedBlockingQueue.java",
+              "lineno": 460,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject",
+              "function": "awaitNanos",
+              "filename": "AbstractQueuedSynchronizer.java",
+              "lineno": 1763,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.util.concurrent.locks.LockSupport",
+              "function": "parkNanos",
+              "filename": "LockSupport.java",
+              "lineno": 269,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "jdk.internal.misc.Unsafe",
+              "function": "park",
+              "filename": "Unsafe.java",
+              "in_app": false
+            }
+          ]
+        }
+      },
+      {
+        "id": 51,
+        "name": "FinalizerWatchdogDaemon",
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "java",
+              "module": "java.lang.Thread",
+              "function": "run",
+              "filename": "Thread.java",
+              "lineno": 1563,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Daemons$Daemon",
+              "function": "run",
+              "filename": "Daemons.java",
+              "lineno": 135,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Daemons$FinalizerWatchdogDaemon",
+              "function": "runInternal",
+              "filename": "Daemons.java",
+              "lineno": 463,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Daemons$FinalizerWatchdogDaemon",
+              "function": "sleepUntilNeeded",
+              "filename": "Daemons.java",
+              "lineno": 483,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Object",
+              "function": "wait",
+              "filename": "Object.java",
+              "lineno": 543,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Object",
+              "function": "wait",
+              "filename": "Object.java",
+              "lineno": 405,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Object",
+              "function": "wait",
+              "filename": "Object.java",
+              "in_app": false
+            }
+          ]
+        }
+      },
+      {
+        "id": 45,
+        "name": "Signal Catcher",
+        "stacktrace": {
+          "type": "raw",
+          "frames": []
+        }
+      },
+      {
+        "id": 63,
+        "name": "binder:6935_4",
+        "stacktrace": {
+          "type": "raw",
+          "frames": []
+        }
+      },
+      {
+        "id": 57,
+        "name": "RenderThread",
+        "stacktrace": {
+          "type": "raw",
+          "frames": []
+        }
+      },
+      {
+        "id": 52,
+        "name": "binder:6935_1",
+        "stacktrace": {
+          "type": "raw",
+          "frames": []
+        }
+      },
+      {
+        "id": 54,
+        "name": "binder:6935_3",
+        "stacktrace": {
+          "type": "raw",
+          "frames": []
+        }
+      },
+      {
+        "id": 60,
+        "name": "hwuiTask1",
+        "stacktrace": {
+          "type": "raw",
+          "frames": []
+        }
+      },
+      {
+        "id": 62,
+        "name": "SurfaceSyncGroupTimer",
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "java",
+              "module": "android.os.HandlerThread",
+              "function": "run",
+              "filename": "HandlerThread.java",
+              "lineno": 139,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.Looper",
+              "function": "loop",
+              "filename": "Looper.java",
+              "lineno": 367,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.Looper",
+              "function": "loopOnce",
+              "filename": "Looper.java",
+              "lineno": 197,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.MessageQueue",
+              "function": "next",
+              "filename": "MessageQueue.java",
+              "lineno": 1094,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.MessageQueue",
+              "function": "nextLegacy",
+              "filename": "MessageQueue.java",
+              "lineno": 985,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.MessageQueue",
+              "function": "nativePollOnce",
+              "filename": "MessageQueue.java",
+              "in_app": false
+            }
+          ]
+        }
+      },
+      {
+        "id": 58,
+        "name": "pool-4-thread-1",
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "java",
+              "module": "java.lang.Thread",
+              "function": "run",
+              "filename": "Thread.java",
+              "lineno": 1563,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.util.concurrent.ThreadPoolExecutor$Worker",
+              "function": "run",
+              "filename": "ThreadPoolExecutor.java",
+              "lineno": 652,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.util.concurrent.ThreadPoolExecutor",
+              "function": "runWorker",
+              "filename": "ThreadPoolExecutor.java",
+              "lineno": 1140,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.util.concurrent.ThreadPoolExecutor",
+              "function": "getTask",
+              "filename": "ThreadPoolExecutor.java",
+              "lineno": 1080,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.util.concurrent.LinkedBlockingQueue",
+              "function": "take",
+              "filename": "LinkedBlockingQueue.java",
+              "lineno": 435,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject",
+              "function": "await",
+              "filename": "AbstractQueuedSynchronizer.java",
+              "lineno": 1712,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.util.concurrent.ForkJoinPool",
+              "function": "managedBlock",
+              "filename": "ForkJoinPool.java",
+              "lineno": 3738,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.util.concurrent.ForkJoinPool",
+              "function": "unmanagedBlock",
+              "filename": "ForkJoinPool.java",
+              "lineno": 3797,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionNode",
+              "function": "block",
+              "filename": "AbstractQueuedSynchronizer.java",
+              "lineno": 519,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.util.concurrent.locks.LockSupport",
+              "function": "park",
+              "filename": "LockSupport.java",
+              "lineno": 371,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "jdk.internal.misc.Unsafe",
+              "function": "park",
+              "filename": "Unsafe.java",
+              "in_app": false
+            }
+          ]
+        }
+      },
+      {
+        "id": 61,
+        "name": "Profile Saver",
+        "stacktrace": {
+          "type": "raw",
+          "frames": []
+        }
+      },
+      {
+        "id": 50,
+        "name": "FinalizerDaemon",
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "java",
+              "module": "java.lang.Thread",
+              "function": "run",
+              "filename": "Thread.java",
+              "lineno": 1563,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Daemons$Daemon",
+              "function": "run",
+              "filename": "Daemons.java",
+              "lineno": 135,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Daemons$FinalizerDaemon",
+              "function": "runInternal",
+              "filename": "Daemons.java",
+              "lineno": 350,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.ref.ReferenceQueue",
+              "function": "remove",
+              "filename": "ReferenceQueue.java",
+              "lineno": 228,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.ref.ReferenceQueue",
+              "function": "remove",
+              "filename": "ReferenceQueue.java",
+              "lineno": 207,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Object",
+              "function": "wait",
+              "filename": "Object.java",
+              "lineno": 405,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Object",
+              "function": "wait",
+              "filename": "Object.java",
+              "in_app": false
+            }
+          ]
+        }
+      },
+      {
+        "id": 53,
+        "name": "binder:6935_2",
+        "stacktrace": {
+          "type": "raw",
+          "frames": []
+        }
+      }
+    ]
+  }
+}

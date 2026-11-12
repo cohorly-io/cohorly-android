@@ -6,9 +6,12 @@ import com.cohorly.android.core.CohorlyConfig
 import com.cohorly.android.core.CohorlyCore
 import com.cohorly.android.core.CohorlyFlagsFetcher
 import com.cohorly.android.core.CohorlyTransport
+import com.cohorly.android.core.FlagDetails
 import com.cohorly.android.core.FlagResult
 import com.cohorly.android.core.HttpUrlConnectionFlagsFetcher
 import com.cohorly.android.core.HttpUrlConnectionTransport
+import com.cohorly.android.core.crash.CrashConfig
+import com.cohorly.android.crash.CohorlyCrashReporter
 import org.json.JSONObject
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
@@ -26,7 +29,13 @@ import java.util.concurrent.TimeUnit
  * One instance per project token (like mixpanel-android). All work runs on a
  * single background thread; every public method returns immediately.
  */
-class Cohorly private constructor(private val core: CohorlyCore, private val executor: ScheduledExecutorService) {
+class Cohorly private constructor(
+    private val core: CohorlyCore,
+    private val executor: ScheduledExecutorService,
+    private val app: Context,
+    private val token: String,
+    private val apiHost: String,
+) {
     private val batchSize = core.config.batchSize.coerceIn(1, CohorlyCore.SERVER_MAX_BATCH)
 
     val people: People = People()
@@ -60,15 +69,22 @@ class Cohorly private constructor(private val core: CohorlyCore, private val exe
                 instances[token]?.let { return it }
 
                 val app = context.applicationContext
-                val core = CohorlyCore(
-                    apiHost = apiHost,
-                    token = token,
-                    storage = SharedPreferencesStorage(app, token),
-                    transport = transport,
-                    deviceInfo = AndroidDeviceInfo(app),
-                    flagsFetcher = flagsFetcher,
-                    config = config,
-                )
+                val storage = NoBackupFileStorage(app, token)
+                // getInstance runs on the caller's thread, normally the main
+                // one. On a fresh install the core's constructor persists the
+                // distinct id, the anonymous flag and the device id; batching
+                // makes that one write+fsync instead of three.
+                val core = storage.batch {
+                    CohorlyCore(
+                        apiHost = apiHost,
+                        token = token,
+                        storage = storage,
+                        transport = transport,
+                        deviceInfo = AndroidDeviceInfo(app),
+                        flagsFetcher = flagsFetcher,
+                        config = config,
+                    )
+                }
                 val executor = Executors.newSingleThreadScheduledExecutor { runnable ->
                     Thread(runnable, "cohorly-worker").apply { isDaemon = true }
                 }
@@ -80,7 +96,8 @@ class Cohorly private constructor(private val core: CohorlyCore, private val exe
                         TimeUnit.MILLISECONDS,
                     )
                 }
-                val instance = Cohorly(core, executor)
+                val instance = Cohorly(core, executor, app, token, apiHost.trimEnd('/'))
+                instance.syncCrashConfig()
                 // First flag evaluation for the persisted identity, off the
                 // caller's thread. Fire and forget - failures keep the cache.
                 if (config.loadFeatureFlags) {
@@ -171,6 +188,7 @@ class Cohorly private constructor(private val core: CohorlyCore, private val exe
         val wasDifferent = core.getDistinctId() != distinctId
         val alias = core.setIdentity(distinctId)
         if (alias != null) executor.execute { core.sendAlias(alias) }
+        syncCrashConfig()
         // Flags are per-identity: refresh them for the new id on the worker.
         if (wasDifferent && core.getDistinctId() == distinctId) {
             executor.execute { core.reloadFeatureFlags() }
@@ -189,6 +207,7 @@ class Cohorly private constructor(private val core: CohorlyCore, private val exe
     /** Clears identity, super properties, and unsent data (call on logout). */
     fun reset() {
         executor.execute { core.reset() }
+        syncCrashConfig()
     }
 
     // MARK: feature flags
@@ -209,8 +228,30 @@ class Cohorly private constructor(private val core: CohorlyCore, private val exe
      */
     fun getFeatureFlag(key: String): Any = core.getFeatureFlag(key)
 
+    /**
+     * The flag's value, or [fallback] when the flag is unknown or unloaded.
+     * A read that resolves to [fallback] reports no `$feature_flag_called`
+     * exposure.
+     */
+    fun getFeatureFlag(key: String, fallback: Any): Any = core.getFeatureFlag(key, fallback)
+
     /** Whether [key] is enabled. False for an unknown or unloaded flag. */
     fun isFeatureEnabled(key: String): Boolean = core.isFeatureEnabled(key)
+
+    /**
+     * Whether [key] is enabled, or [fallback] when the flag is unknown or
+     * unloaded. A read that resolves to [fallback] reports no exposure.
+     */
+    fun isFeatureEnabled(key: String, fallback: Boolean): Boolean = core.isFeatureEnabled(key, fallback)
+
+    /**
+     * The full lookup result for [key]: the value plus its [FlagDetails.source]
+     * (`network`, `persistence` or `fallback`), `enabled` and `payload`, with
+     * `persistedAt`/`ttlMs` populated for values served from the persisted
+     * cache.
+     */
+    fun getFeatureFlagDetails(key: String, fallback: Any = false): FlagDetails =
+        core.getFeatureFlagDetails(key, fallback)
 
     /** The JSON payload attached to [key], or null when it has none. */
     fun getFeatureFlagPayload(key: String): Any? = core.getFeatureFlagPayload(key)
@@ -219,12 +260,28 @@ class Cohorly private constructor(private val core: CohorlyCore, private val exe
     fun getFeatureFlags(): Map<String, FlagResult> = core.getFeatureFlags()
 
     /**
-     * Subscribes to flag updates: fires after every successful reload, and
-     * immediately when flags are already loaded. Listeners run on the worker
-     * thread. Returns a function that removes the subscription.
+     * Whether a flag set is currently being served. Goes back to false on
+     * [identify]/[reset] until the new identity's flags land.
      */
-    fun onFeatureFlags(listener: (Map<String, FlagResult>) -> Unit): () -> Unit =
-        core.onFeatureFlags(listener)
+    fun areFeatureFlagsLoaded(): Boolean = core.areFeatureFlagsLoaded()
+
+    /**
+     * Subscribes to flag updates: fires whenever the served set changes -
+     * after every successful reload, when [identify]/[reset] drop the
+     * previous identity's flags (with an empty map), and immediately when
+     * flags are already loaded - including a set adopted from the persisted
+     * cache at startup. A failed reload notifies nobody - the persisted
+     * cache is re-adopted silently. Listeners run on the worker thread.
+     * Returns a function that removes the subscription.
+     */
+    fun onFeatureFlags(listener: (Map<String, FlagResult>) -> Unit): () -> Unit = core.onFeatureFlags { flags ->
+        // identify()/reset() clear the served set on the caller thread
+        // while reload callbacks run on the worker - dispatch every
+        // delivery through the executor so a listener always runs on the
+        // worker thread (and the identity-clear emission stays ordered
+        // before the reload queued right after it).
+        executor.execute { listener(flags) }
+    }
 
     // MARK: super properties
 
@@ -260,10 +317,12 @@ class Cohorly private constructor(private val core: CohorlyCore, private val exe
 
     fun optOutTracking() {
         executor.execute { core.optOutTracking() }
+        syncCrashConfig()
     }
 
     fun optInTracking() {
         executor.execute { core.optInTracking() }
+        syncCrashConfig()
     }
 
     fun hasOptedOutTracking(): Boolean = core.hasOptedOutTracking()
@@ -333,6 +392,31 @@ class Cohorly private constructor(private val core: CohorlyCore, private val exe
     }
 
     // MARK: internals
+
+    /**
+     * With [CohorlyConfig.nativeCrashReporting], writes the crash config for
+     * the reporter that starts on the next launch, and updates the identity of
+     * one already running. Opting out turns it off: no crash is recorded, and
+     * no pending report or exit record is sent, until opt-in. Without
+     * nativeCrashReporting, the config is left untouched: a React Native layer
+     * may be the one managing it.
+     */
+    private fun syncCrashConfig() {
+        if (!core.config.nativeCrashReporting) return
+        // Queued after any identity change already on the worker, so it reads the result.
+        executor.execute {
+            val config = CrashConfig(
+                enabled = !core.hasOptedOutTracking(),
+                release = CohorlyCrashReporter.appInfo(app).defaultRelease,
+                distinctId = core.getDistinctId(),
+                deviceId = core.getDeviceId(),
+                token = token,
+                apiHost = apiHost,
+                anrWatchdog = core.config.anrWatchdog,
+            )
+            CohorlyCrashReporter.configure(app, config.toJson())
+        }
+    }
 
     private fun flushIfBatchReady() {
         if (core.pendingEventCount() >= batchSize) core.maybeFlush()

@@ -1,0 +1,1785 @@
+{
+  "event": "$exception",
+  "properties": {
+    "distinct_id": "spike-user-42",
+    "time": 1794409140044,
+    "$insert_id": "ffa37176-101e-36f5-99e4-922f1ece6fa9",
+    "$lib": "android",
+    "$lib_version": "0.0.0-spike",
+    "$device_id": "b6247659-69a5-46fd-ad0d-a667283607b6",
+    "$os": "Android",
+    "$os_version": "16",
+    "$model": "sdk_gphone64_arm64",
+    "$manufacturer": "Google",
+    "$app_version_string": "0.1.0",
+    "$app_build_number": "7",
+    "$exception_release": "android@0.1.0+7",
+    "$exception_dist": "5f3c2a10-8e4b-4c7d-9a61-0b2e7d4f9c13",
+    "$exception_level": "fatal",
+    "$exception_list": [
+      {
+        "type": "ANR",
+        "value": "user request after error: Input dispatching timed out (c21adc8 com.cohorly.spike.crash/com.cohorly.spike.crash.MainActivity is not responding. Waited 5002ms for MotionEvent).",
+        "mechanism": {
+          "handled": false,
+          "type": "anr",
+          "synthetic": false
+        },
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "java",
+              "module": "com.android.internal.os.ZygoteInit",
+              "function": "main",
+              "filename": "ZygoteInit.java",
+              "lineno": 929,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "com.android.internal.os.RuntimeInit$MethodAndArgsCaller",
+              "function": "run",
+              "filename": "RuntimeInit.java",
+              "lineno": 566,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.reflect.Method",
+              "function": "invoke",
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.app.ActivityThread",
+              "function": "main",
+              "filename": "ActivityThread.java",
+              "lineno": 9287,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.Looper",
+              "function": "loop",
+              "filename": "Looper.java",
+              "lineno": 367,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.Looper",
+              "function": "loopOnce",
+              "filename": "Looper.java",
+              "lineno": 263,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.Looper",
+              "function": "dispatchMessage",
+              "filename": "Looper.java",
+              "lineno": 333,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.Handler",
+              "function": "dispatchMessage",
+              "filename": "Handler.java",
+              "lineno": 125,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.Handler",
+              "function": "handleCallback",
+              "filename": "Handler.java",
+              "lineno": 1070,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.view.View$PerformClick",
+              "function": "run",
+              "filename": "View.java",
+              "lineno": 31919,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.view.View",
+              "function": "-$$Nest$mperformClickInternal",
+              "filename": "unavailable",
+              "lineno": 0,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.view.View",
+              "function": "performClickInternal",
+              "filename": "View.java",
+              "lineno": 8181,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.view.View",
+              "function": "performClick",
+              "filename": "View.java",
+              "lineno": 8204,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.MainActivity$$ExternalSyntheticLambda3",
+              "function": "onClick",
+              "filename": "D8$$SyntheticClass",
+              "lineno": 0,
+              "in_app": true
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.MainActivity",
+              "function": "$r8$lambda$Ko6MuBcBLnzARZaAx0mDXnOr-kQ",
+              "filename": "unavailable",
+              "lineno": 0,
+              "in_app": true
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.MainActivity",
+              "function": "onCreate$button$lambda$3$lambda$2",
+              "filename": "MainActivity.kt",
+              "lineno": 24,
+              "in_app": true
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.MainActivity$$ExternalSyntheticLambda10",
+              "function": "invoke",
+              "filename": "D8$$SyntheticClass",
+              "lineno": 0,
+              "in_app": true
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.MainActivity",
+              "function": "$r8$lambda$W1TCfopK0HCDXDZ63v00Pq2ZF_E",
+              "filename": "unavailable",
+              "lineno": 0,
+              "in_app": true
+            },
+            {
+              "platform": "java",
+              "module": "com.cohorly.spike.crash.MainActivity",
+              "function": "onCreate$lambda$10",
+              "filename": "MainActivity.kt",
+              "lineno": 43,
+              "in_app": true
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Thread",
+              "function": "sleep",
+              "filename": "Thread.java",
+              "lineno": 572,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Thread",
+              "function": "sleep",
+              "filename": "Thread.java",
+              "lineno": 659,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Thread",
+              "function": "sleep0",
+              "filename": "Thread.java",
+              "lineno": 681,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Thread",
+              "function": "sleep",
+              "in_app": false
+            }
+          ]
+        }
+      }
+    ],
+    "$exception_threads": [
+      {
+        "id": 7,
+        "name": "ReferenceQueueDaemon",
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "java",
+              "module": "java.lang.Thread",
+              "function": "run",
+              "filename": "Thread.java",
+              "lineno": 1563,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Daemons$Daemon",
+              "function": "run",
+              "filename": "Daemons.java",
+              "lineno": 135,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Daemons$ReferenceQueueDaemon",
+              "function": "runInternal",
+              "filename": "Daemons.java",
+              "lineno": 262,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Object",
+              "function": "wait",
+              "filename": "Object.java",
+              "lineno": 543,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Object",
+              "function": "wait",
+              "filename": "Object.java",
+              "lineno": 405,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Object",
+              "function": "wait",
+              "in_app": false
+            }
+          ]
+        }
+      },
+      {
+        "id": 8,
+        "name": "FinalizerDaemon",
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "java",
+              "module": "java.lang.Thread",
+              "function": "run",
+              "filename": "Thread.java",
+              "lineno": 1563,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Daemons$Daemon",
+              "function": "run",
+              "filename": "Daemons.java",
+              "lineno": 135,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Daemons$FinalizerDaemon",
+              "function": "runInternal",
+              "filename": "Daemons.java",
+              "lineno": 350,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.ref.ReferenceQueue",
+              "function": "remove",
+              "filename": "ReferenceQueue.java",
+              "lineno": 228,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.ref.ReferenceQueue",
+              "function": "remove",
+              "filename": "ReferenceQueue.java",
+              "lineno": 207,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Object",
+              "function": "wait",
+              "filename": "Object.java",
+              "lineno": 405,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Object",
+              "function": "wait",
+              "in_app": false
+            }
+          ]
+        }
+      },
+      {
+        "id": 9,
+        "name": "FinalizerWatchdogDaemon",
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "java",
+              "module": "java.lang.Thread",
+              "function": "run",
+              "filename": "Thread.java",
+              "lineno": 1563,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Daemons$Daemon",
+              "function": "run",
+              "filename": "Daemons.java",
+              "lineno": 135,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Daemons$FinalizerWatchdogDaemon",
+              "function": "runInternal",
+              "filename": "Daemons.java",
+              "lineno": 463,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Daemons$FinalizerWatchdogDaemon",
+              "function": "sleepUntilNeeded",
+              "filename": "Daemons.java",
+              "lineno": 483,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Object",
+              "function": "wait",
+              "filename": "Object.java",
+              "lineno": 543,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Object",
+              "function": "wait",
+              "filename": "Object.java",
+              "lineno": 405,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Object",
+              "function": "wait",
+              "in_app": false
+            }
+          ]
+        }
+      },
+      {
+        "id": 2,
+        "name": "Signal Catcher",
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__start_thread",
+              "instruction_addr": "0x0000000000078d64",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__pthread_start ",
+              "instruction_addr": "0x0000000000086580",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libart.so",
+              "function": "art::SignalCatcher::Run",
+              "instruction_addr": "0x00000000004bc4b4",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "6cac8d43981d3cdaec56bfd359a7c85c",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libart.so",
+              "function": "art::SignalCatcher::HandleSigQuit",
+              "instruction_addr": "0x00000000005454f0",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "6cac8d43981d3cdaec56bfd359a7c85c",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libart.so",
+              "function": "art::Runtime::DumpForSigQuit",
+              "instruction_addr": "0x00000000004d8634",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "6cac8d43981d3cdaec56bfd359a7c85c",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libart.so",
+              "function": "art::ThreadList::DumpForSigQuit",
+              "instruction_addr": "0x00000000004d9748",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "6cac8d43981d3cdaec56bfd359a7c85c",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libart.so",
+              "function": "art::ThreadList::Dump",
+              "instruction_addr": "0x00000000004d9d04",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "6cac8d43981d3cdaec56bfd359a7c85c",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libart.so",
+              "function": "art::ThreadList::RunCheckpoint",
+              "instruction_addr": "0x0000000000283d48",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "6cac8d43981d3cdaec56bfd359a7c85c",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libart.so",
+              "function": "art::DumpCheckpoint::Run",
+              "instruction_addr": "0x00000000004daa98",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "6cac8d43981d3cdaec56bfd359a7c85c",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libart.so",
+              "function": "art::Thread::DumpStack const",
+              "instruction_addr": "0x00000000004dacb0",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "6cac8d43981d3cdaec56bfd359a7c85c",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libart.so",
+              "function": "art::DumpNativeStack",
+              "instruction_addr": "0x00000000004d56a0",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "6cac8d43981d3cdaec56bfd359a7c85c",
+              "in_app": false
+            }
+          ]
+        }
+      },
+      {
+        "id": 3,
+        "name": "perfetto_hprof_listener",
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__start_thread",
+              "instruction_addr": "0x0000000000078d64",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__pthread_start ",
+              "instruction_addr": "0x0000000000086580",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libperfetto_hprof.so",
+              "function": "void* std::__1::__thread_proxy[abi:nn210000]<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct>>, ArtPlugin_Initialize::$_7>>",
+              "instruction_addr": "0x000000000002d870",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "ad4ab0ed0770798eac633db2a2ef93aa",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "read",
+              "instruction_addr": "0x00000000000d5604",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            }
+          ]
+        }
+      },
+      {
+        "id": 4,
+        "name": "ADB-JDWP Connection Control Thread",
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__start_thread",
+              "instruction_addr": "0x0000000000078d64",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__pthread_start ",
+              "instruction_addr": "0x0000000000086580",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libadbconnection.so",
+              "function": "adbconnection::CallbackFunction",
+              "instruction_addr": "0x000000000000c79c",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "48f0307585d820cb5a5a3725ef12efea",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libadbconnection.so",
+              "function": "adbconnection::AdbConnectionState::RunPollLoop",
+              "instruction_addr": "0x000000000000e388",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "48f0307585d820cb5a5a3725ef12efea",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "poll",
+              "instruction_addr": "0x0000000000084110",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__ppoll",
+              "instruction_addr": "0x00000000000d7ec8",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            }
+          ]
+        }
+      },
+      {
+        "id": 5,
+        "name": "Jit thread pool worker thread 0",
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__start_thread",
+              "instruction_addr": "0x0000000000078d64",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__pthread_start ",
+              "instruction_addr": "0x0000000000086580",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libart.so",
+              "function": "art::ThreadPoolWorker::Callback",
+              "instruction_addr": "0x00000000004bd07c",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "6cac8d43981d3cdaec56bfd359a7c85c",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libart.so",
+              "function": "art::ThreadPoolWorker::Run",
+              "instruction_addr": "0x00000000004721e4",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "6cac8d43981d3cdaec56bfd359a7c85c",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libart.so",
+              "function": "art::ConditionVariable::WaitHoldingLocks",
+              "instruction_addr": "0x0000000000201434",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "6cac8d43981d3cdaec56bfd359a7c85c",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "syscall",
+              "instruction_addr": "0x000000000009bf5c",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            }
+          ]
+        }
+      },
+      {
+        "id": 6,
+        "name": "HeapTaskDaemon",
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "java",
+              "module": "java.lang.Thread",
+              "function": "run",
+              "filename": "Thread.java",
+              "lineno": 1563,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Daemons$Daemon",
+              "function": "run",
+              "filename": "Daemons.java",
+              "lineno": 135,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.lang.Daemons$HeapTaskDaemon",
+              "function": "runInternal",
+              "filename": "Daemons.java",
+              "lineno": 766,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "dalvik.system.VMRuntime",
+              "function": "runHeapTasks",
+              "in_app": false
+            }
+          ]
+        }
+      },
+      {
+        "id": 10,
+        "name": "binder:13814_1",
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__start_thread",
+              "instruction_addr": "0x0000000000078d64",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__pthread_start ",
+              "instruction_addr": "0x0000000000086580",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libutils.so",
+              "function": "libutil_thread_trampoline ",
+              "instruction_addr": "0x0000000000019eec",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "37e757db39656b6e1b2383db61e3d767",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libandroid_runtime.so",
+              "function": "android::AndroidRuntime::javaThreadShell",
+              "instruction_addr": "0x0000000000137b84",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "01e2931b3e7e79e8f19cd56ed189bf7f",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libutils.so",
+              "function": "android::Thread::_threadLoop",
+              "instruction_addr": "0x0000000000017d08",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "37e757db39656b6e1b2383db61e3d767",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libbinder.so",
+              "function": "android::PoolThread::threadLoop",
+              "instruction_addr": "0x000000000008e71c",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f7c6a48d40eae48b331bbf28791817c8",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libbinder.so",
+              "function": "android::IPCThreadState::joinThreadPool",
+              "instruction_addr": "0x000000000008e7c0",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f7c6a48d40eae48b331bbf28791817c8",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libbinder.so",
+              "function": "android::IPCThreadState::talkWithDriver",
+              "instruction_addr": "0x000000000004c0e0",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f7c6a48d40eae48b331bbf28791817c8",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "ioctl",
+              "instruction_addr": "0x0000000000081618",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__ioctl",
+              "instruction_addr": "0x00000000000d5c48",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            }
+          ]
+        }
+      },
+      {
+        "id": 11,
+        "name": "binder:13814_2",
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__start_thread",
+              "instruction_addr": "0x0000000000078d64",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__pthread_start ",
+              "instruction_addr": "0x0000000000086580",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libutils.so",
+              "function": "libutil_thread_trampoline ",
+              "instruction_addr": "0x0000000000019eec",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "37e757db39656b6e1b2383db61e3d767",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libandroid_runtime.so",
+              "function": "android::AndroidRuntime::javaThreadShell",
+              "instruction_addr": "0x0000000000137b84",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "01e2931b3e7e79e8f19cd56ed189bf7f",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libutils.so",
+              "function": "android::Thread::_threadLoop",
+              "instruction_addr": "0x0000000000017d08",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "37e757db39656b6e1b2383db61e3d767",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libbinder.so",
+              "function": "android::PoolThread::threadLoop",
+              "instruction_addr": "0x000000000008e71c",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f7c6a48d40eae48b331bbf28791817c8",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libbinder.so",
+              "function": "android::IPCThreadState::joinThreadPool",
+              "instruction_addr": "0x000000000008e7c0",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f7c6a48d40eae48b331bbf28791817c8",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libbinder.so",
+              "function": "android::IPCThreadState::talkWithDriver",
+              "instruction_addr": "0x000000000004c0e0",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f7c6a48d40eae48b331bbf28791817c8",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "ioctl",
+              "instruction_addr": "0x0000000000081618",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__ioctl",
+              "instruction_addr": "0x00000000000d5c48",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            }
+          ]
+        }
+      },
+      {
+        "id": 12,
+        "name": "binder:13814_3",
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__start_thread",
+              "instruction_addr": "0x0000000000078d64",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__pthread_start ",
+              "instruction_addr": "0x0000000000086580",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libutils.so",
+              "function": "libutil_thread_trampoline ",
+              "instruction_addr": "0x0000000000019eec",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "37e757db39656b6e1b2383db61e3d767",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libandroid_runtime.so",
+              "function": "android::AndroidRuntime::javaThreadShell",
+              "instruction_addr": "0x0000000000137b84",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "01e2931b3e7e79e8f19cd56ed189bf7f",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libutils.so",
+              "function": "android::Thread::_threadLoop",
+              "instruction_addr": "0x0000000000017d08",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "37e757db39656b6e1b2383db61e3d767",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libbinder.so",
+              "function": "android::PoolThread::threadLoop",
+              "instruction_addr": "0x000000000008e71c",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f7c6a48d40eae48b331bbf28791817c8",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libbinder.so",
+              "function": "android::IPCThreadState::joinThreadPool",
+              "instruction_addr": "0x000000000008e7c0",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f7c6a48d40eae48b331bbf28791817c8",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libbinder.so",
+              "function": "android::IPCThreadState::talkWithDriver",
+              "instruction_addr": "0x000000000004c0e0",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f7c6a48d40eae48b331bbf28791817c8",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "ioctl",
+              "instruction_addr": "0x0000000000081618",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__ioctl",
+              "instruction_addr": "0x00000000000d5c48",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            }
+          ]
+        }
+      },
+      {
+        "id": 13,
+        "name": "Profile Saver",
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__start_thread",
+              "instruction_addr": "0x0000000000078d64",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__pthread_start ",
+              "instruction_addr": "0x0000000000086580",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libart.so",
+              "function": "art::ProfileSaver::RunProfileSaverThread",
+              "instruction_addr": "0x00000000004bcac8",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "6cac8d43981d3cdaec56bfd359a7c85c",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libart.so",
+              "function": "art::ConditionVariable::WaitHoldingLocks",
+              "instruction_addr": "0x0000000000201434",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "6cac8d43981d3cdaec56bfd359a7c85c",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "syscall",
+              "instruction_addr": "0x000000000009bf5c",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            }
+          ]
+        }
+      },
+      {
+        "id": 15,
+        "name": "pool-4-thread-1",
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "java",
+              "module": "java.lang.Thread",
+              "function": "run",
+              "filename": "Thread.java",
+              "lineno": 1563,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.util.concurrent.ThreadPoolExecutor$Worker",
+              "function": "run",
+              "filename": "ThreadPoolExecutor.java",
+              "lineno": 652,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.util.concurrent.ThreadPoolExecutor",
+              "function": "runWorker",
+              "filename": "ThreadPoolExecutor.java",
+              "lineno": 1140,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.util.concurrent.ThreadPoolExecutor",
+              "function": "getTask",
+              "filename": "ThreadPoolExecutor.java",
+              "lineno": 1080,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.util.concurrent.LinkedBlockingQueue",
+              "function": "take",
+              "filename": "LinkedBlockingQueue.java",
+              "lineno": 435,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject",
+              "function": "await",
+              "filename": "AbstractQueuedSynchronizer.java",
+              "lineno": 1712,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.util.concurrent.ForkJoinPool",
+              "function": "managedBlock",
+              "filename": "ForkJoinPool.java",
+              "lineno": 3738,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.util.concurrent.ForkJoinPool",
+              "function": "unmanagedBlock",
+              "filename": "ForkJoinPool.java",
+              "lineno": 3797,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionNode",
+              "function": "block",
+              "filename": "AbstractQueuedSynchronizer.java",
+              "lineno": 519,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "java.util.concurrent.locks.LockSupport",
+              "function": "park",
+              "filename": "LockSupport.java",
+              "lineno": 371,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "jdk.internal.misc.Unsafe",
+              "function": "park",
+              "in_app": false
+            }
+          ]
+        }
+      },
+      {
+        "id": 16,
+        "name": "RenderThread",
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__start_thread",
+              "instruction_addr": "0x0000000000078d64",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__pthread_start ",
+              "instruction_addr": "0x0000000000086580",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libutils.so",
+              "function": "libutil_thread_trampoline ",
+              "instruction_addr": "0x0000000000019eec",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "37e757db39656b6e1b2383db61e3d767",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libutils.so",
+              "function": "android::Thread::_threadLoop",
+              "instruction_addr": "0x0000000000017d08",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "37e757db39656b6e1b2383db61e3d767",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libhwui.so",
+              "function": "android::uirenderer::renderthread::RenderThread::threadLoop",
+              "instruction_addr": "0x0000000000567460",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "787b46caf3ef7690d5b2baf831b03f66",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libutils.so",
+              "function": "android::Looper::pollOnce",
+              "instruction_addr": "0x000000000001afd0",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "37e757db39656b6e1b2383db61e3d767",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__epoll_pwait",
+              "instruction_addr": "0x00000000000d7c88",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            }
+          ]
+        }
+      },
+      {
+        "id": 17,
+        "name": "hwuiTask0",
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__start_thread",
+              "instruction_addr": "0x0000000000078d64",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__pthread_start ",
+              "instruction_addr": "0x0000000000086580",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libhwui.so",
+              "function": "void* std::__1::__thread_proxy[abi:nn210000]<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct>>, android::uirenderer::CommonPool::CommonPool::$_0>> ",
+              "instruction_addr": "0x00000000004ec090",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "787b46caf3ef7690d5b2baf831b03f66",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libhwui.so",
+              "function": "android::uirenderer::CommonPool::workerLoop",
+              "instruction_addr": "0x00000000004ec1e8",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "787b46caf3ef7690d5b2baf831b03f66",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc++.so",
+              "function": "std::__1::condition_variable::wait",
+              "instruction_addr": "0x00000000000adb68",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "3f6a75430111b7c3bac48af41a15963c1b45ab49",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "pthread_cond_wait",
+              "instruction_addr": "0x0000000000085788",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__futex_wait_ex",
+              "instruction_addr": "0x00000000000779ac",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "syscall",
+              "instruction_addr": "0x000000000009bf5c",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            }
+          ]
+        }
+      },
+      {
+        "id": 18,
+        "name": "hwuiTask1",
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__start_thread",
+              "instruction_addr": "0x0000000000078d64",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__pthread_start ",
+              "instruction_addr": "0x0000000000086580",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libhwui.so",
+              "function": "void* std::__1::__thread_proxy[abi:nn210000]<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct>>, android::uirenderer::CommonPool::CommonPool::$_0>> ",
+              "instruction_addr": "0x00000000004ec090",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "787b46caf3ef7690d5b2baf831b03f66",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libhwui.so",
+              "function": "android::uirenderer::CommonPool::workerLoop",
+              "instruction_addr": "0x00000000004ec1e8",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "787b46caf3ef7690d5b2baf831b03f66",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc++.so",
+              "function": "std::__1::condition_variable::wait",
+              "instruction_addr": "0x00000000000adb68",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "3f6a75430111b7c3bac48af41a15963c1b45ab49",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "pthread_cond_wait",
+              "instruction_addr": "0x0000000000085788",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__futex_wait_ex",
+              "instruction_addr": "0x00000000000779ac",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "syscall",
+              "instruction_addr": "0x000000000009bf5c",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            }
+          ]
+        }
+      },
+      {
+        "id": 19,
+        "name": "SurfaceSyncGroupTimer",
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "java",
+              "module": "android.os.HandlerThread",
+              "function": "run",
+              "filename": "HandlerThread.java",
+              "lineno": 139,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.Looper",
+              "function": "loop",
+              "filename": "Looper.java",
+              "lineno": 367,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.Looper",
+              "function": "loopOnce",
+              "filename": "Looper.java",
+              "lineno": 197,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.MessageQueue",
+              "function": "next",
+              "filename": "MessageQueue.java",
+              "lineno": 1094,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.MessageQueue",
+              "function": "nextLegacy",
+              "filename": "MessageQueue.java",
+              "lineno": 985,
+              "in_app": false
+            },
+            {
+              "platform": "java",
+              "module": "android.os.MessageQueue",
+              "function": "nativePollOnce",
+              "in_app": false
+            }
+          ]
+        }
+      },
+      {
+        "id": 20,
+        "name": "binder:13814_4",
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__start_thread",
+              "instruction_addr": "0x0000000000078d64",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__pthread_start ",
+              "instruction_addr": "0x0000000000086580",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libutils.so",
+              "function": "libutil_thread_trampoline ",
+              "instruction_addr": "0x0000000000019eec",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "37e757db39656b6e1b2383db61e3d767",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libandroid_runtime.so",
+              "function": "android::AndroidRuntime::javaThreadShell",
+              "instruction_addr": "0x0000000000137b84",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "01e2931b3e7e79e8f19cd56ed189bf7f",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libutils.so",
+              "function": "android::Thread::_threadLoop",
+              "instruction_addr": "0x0000000000017d08",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "37e757db39656b6e1b2383db61e3d767",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libbinder.so",
+              "function": "android::PoolThread::threadLoop",
+              "instruction_addr": "0x000000000008e71c",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f7c6a48d40eae48b331bbf28791817c8",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libbinder.so",
+              "function": "android::IPCThreadState::joinThreadPool",
+              "instruction_addr": "0x000000000008e7c0",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f7c6a48d40eae48b331bbf28791817c8",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libbinder.so",
+              "function": "android::IPCThreadState::talkWithDriver",
+              "instruction_addr": "0x000000000004c0e0",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f7c6a48d40eae48b331bbf28791817c8",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "ioctl",
+              "instruction_addr": "0x0000000000081618",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__ioctl",
+              "instruction_addr": "0x00000000000d5c48",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            }
+          ]
+        }
+      },
+      {
+        "id": 21,
+        "name": "binder:13814_5",
+        "stacktrace": {
+          "type": "raw",
+          "frames": [
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__start_thread",
+              "instruction_addr": "0x0000000000078d64",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__pthread_start ",
+              "instruction_addr": "0x0000000000086580",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libgui.so",
+              "function": "void* std::__1::__thread_proxy[abi:nn210000]<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct>>, void , android::AsyncWorker*>>",
+              "instruction_addr": "0x00000000000c9ed4",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "1a6b7166e577e048b9baf966a9f80c55",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libgui.so",
+              "function": "android::AsyncWorker::run",
+              "instruction_addr": "0x0000000000125558",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "1a6b7166e577e048b9baf966a9f80c55",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc++.so",
+              "function": "std::__1::condition_variable::wait",
+              "instruction_addr": "0x00000000000adb68",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "3f6a75430111b7c3bac48af41a15963c1b45ab49",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "pthread_cond_wait",
+              "instruction_addr": "0x0000000000085788",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__futex_wait_ex",
+              "instruction_addr": "0x00000000000779ac",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "syscall",
+              "instruction_addr": "0x000000000009bf5c",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__start_thread",
+              "instruction_addr": "0x0000000000078d64",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__pthread_start ",
+              "instruction_addr": "0x0000000000086580",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libperfetto_c.so",
+              "function": "void* std::__1::__thread_proxy[abi:nn210000]<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct>>, void , perfetto::base::ThreadTaskRunner*, std::__1::function<void >>>",
+              "instruction_addr": "0x0000000000053ff4",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "807fc4f44288e6d00057c82c207e11b6",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libperfetto_c.so",
+              "function": "perfetto::base::ThreadTaskRunner::RunTaskThread",
+              "instruction_addr": "0x0000000000053bd8",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "807fc4f44288e6d00057c82c207e11b6",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libperfetto_c.so",
+              "function": "perfetto::base::UnixTaskRunner::Run",
+              "instruction_addr": "0x0000000000054a90",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "807fc4f44288e6d00057c82c207e11b6",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "poll",
+              "instruction_addr": "0x0000000000084110",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__ppoll",
+              "instruction_addr": "0x00000000000d7ec8",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__start_thread",
+              "instruction_addr": "0x0000000000078d64",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__pthread_start ",
+              "instruction_addr": "0x0000000000086580",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libutils.so",
+              "function": "libutil_thread_trampoline ",
+              "instruction_addr": "0x0000000000019eec",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "37e757db39656b6e1b2383db61e3d767",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libandroid_runtime.so",
+              "function": "android::AndroidRuntime::javaThreadShell",
+              "instruction_addr": "0x0000000000137b84",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "01e2931b3e7e79e8f19cd56ed189bf7f",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libutils.so",
+              "function": "android::Thread::_threadLoop",
+              "instruction_addr": "0x0000000000017d08",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "37e757db39656b6e1b2383db61e3d767",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libbinder.so",
+              "function": "android::PoolThread::threadLoop",
+              "instruction_addr": "0x000000000008e71c",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f7c6a48d40eae48b331bbf28791817c8",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libbinder.so",
+              "function": "android::IPCThreadState::joinThreadPool",
+              "instruction_addr": "0x000000000008e7c0",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f7c6a48d40eae48b331bbf28791817c8",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libbinder.so",
+              "function": "android::IPCThreadState::talkWithDriver",
+              "instruction_addr": "0x000000000004c0e0",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f7c6a48d40eae48b331bbf28791817c8",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "ioctl",
+              "instruction_addr": "0x0000000000081618",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            },
+            {
+              "platform": "native",
+              "module": "libc.so",
+              "function": "__ioctl",
+              "instruction_addr": "0x00000000000d5c48",
+              "image_addr": "0x0000000000000000",
+              "debug_id": "f2ee009c5f1631f9819057446c9d2fa3",
+              "in_app": false
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

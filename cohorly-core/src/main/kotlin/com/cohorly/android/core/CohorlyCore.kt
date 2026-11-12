@@ -36,7 +36,15 @@ class CohorlyCore(
     /** Jitter source in [-1, 1]; injectable for deterministic backoff tests. */
     private val jitterSource: () -> Double = { Random.nextDouble() * 2 - 1 },
 ) {
-    private object Keys {
+    /**
+     * Storage keys. `internal` rather than private so InstallGuard.kt can clear
+     * exactly these on a restored install without duplicating the names.
+     * Kotlin's `internal` is compiler-enforced but not JVM-private, so these
+     * constants are technically reachable from Java in the published artifact -
+     * an acceptable trade for one source of truth, since the key names are
+     * already visible in the persisted JSON file itself.
+     */
+    internal object Keys {
         const val DISTINCT_ID = "cohorly.distinct_id"
         const val DEVICE_ID = "cohorly.device_id"
         const val ANONYMOUS = "cohorly.anonymous"
@@ -50,6 +58,12 @@ class CohorlyCore(
          * distinct id so one user's flags are never served to another.
          */
         const val FLAGS = "cohorly.flags"
+
+        /**
+         * Identifies the install this state belongs to (see [InstallGuard]).
+         * Written by the platform module, never read by the core.
+         */
+        const val INSTALL_STAMP = "cohorly.install_stamp"
     }
 
     companion object {
@@ -61,6 +75,16 @@ class CohorlyCore(
 
         /** Exponential backoff base, ms. */
         const val BACKOFF_BASE_MS = 2_000L
+
+        /**
+         * Hard staleness bound for the persisted flag cache under
+         * [FlagPersistenceMode.persistenceUntilNetworkSuccess]: 7 days. That
+         * policy trades freshness for offline availability, so a cache past
+         * [CohorlyConfig.flagCacheTtlMs] is still served while it is within
+         * this window - the served window is the wider of the configured TTL
+         * and 7 days.
+         */
+        const val FLAG_CACHE_MAX_STALE_MS = 7L * 24 * 60 * 60 * 1000
     }
 
     private val apiHost: String = apiHost.trimEnd('/')
@@ -100,6 +124,18 @@ class CohorlyCore(
     /** True once flags were loaded, from the persisted cache or a reload. */
     private var flagsLoaded = false
 
+    /**
+     * Effective cache TTL: [CohorlyConfig.flagCacheTtlMs] must be a positive
+     * duration; a non-positive value falls back to the 24h default so it
+     * cannot disable or unbound the cache window.
+     */
+    private val flagCacheTtlMs: Long =
+        if (config.flagCacheTtlMs > 0) {
+            config.flagCacheTtlMs
+        } else {
+            CohorlyConfig.DEFAULT_FLAG_CACHE_TTL_MS
+        }
+
     /** Bumped per reload; a response carrying an older value is stale. */
     private var flagRequestSeq = 0L
 
@@ -113,6 +149,16 @@ class CohorlyCore(
      * [setIdentity]/[reset], so a new identity re-reports its exposures once.
      */
     private val reportedExposures = HashSet<String>()
+
+    /**
+     * Where the currently served flag set came from (null until flags load).
+     * One source covers the whole map because the set is swapped atomically:
+     * a cache load or a network success replaces it wholesale, never per key.
+     */
+    private var flagSource: FlagSource? = null
+
+    /** Epoch ms the served flag set was persisted; non-null only while [flagSource] is [FlagSource.persistence]. */
+    private var flagPersistedAt: Long? = null
 
     val people: People = People()
 
@@ -146,29 +192,16 @@ class CohorlyCore(
 
         effectiveBatchSize = batchSize
 
-        // Feature-flag cache: served only when it belongs to the current
-        // distinct id; another identity's cache is dropped, never served.
-        val cache = storage.get(Keys.FLAGS)?.let { raw ->
-            try {
-                JSONObject(raw)
-            } catch (_: Exception) {
-                null
-            }
-        }
-        if (cache != null) {
-            val parsed = if (cache.optString("distinct_id") == distinctId) {
-                parseFlagsResponse(cache.toString())
-            } else {
-                null
-            }
-            if (parsed != null) {
-                flags = parsed
-                flagsLoaded = true
-            } else {
-                // Another identity's cache, or an unparseable one: drop it
-                // rather than reporting flags as loaded-and-empty.
-                storage.set(Keys.FLAGS, null)
-            }
+        // Feature-flag cache, per config.flagPersistence: the persistent
+        // modes adopt a valid cache immediately (synchronous reads cannot
+        // await the network the way Mixpanel's async lookups do, so
+        // networkFirst serves identically to persistenceUntilNetworkSuccess -
+        // see the enum doc); networkOnly never reads nor writes the key on
+        // the serving path (identify()/reset() still remove it - that is
+        // identity hygiene, not flag serving). Safe to run outside the lock -
+        // the instance is not published yet.
+        if (config.flagPersistence != FlagPersistenceMode.networkOnly) {
+            loadPersistedFlagsLocked()
         }
 
         automaticEvents = if (config.trackAutomaticEvents) {
@@ -206,23 +239,49 @@ class CohorlyCore(
      * Applies the identity switch synchronously and returns the `/alias`
      * payload to send when the previous id was anonymous, else null.
      */
-    fun setIdentity(newDistinctId: String): JSONObject? = synchronized(lock) {
-        if (optedOut || newDistinctId == distinctId) return null
-        val aliasPayload = if (anonymous) {
-            JSONObject()
-                .put("alias", distinctId)
-                .put("distinct_id", newDistinctId)
-                .also { if (token != null) it.put("token", token) }
-        } else {
-            null
+    fun setIdentity(newDistinctId: String): JSONObject? {
+        val (aliasPayload, listeners) = synchronized(lock) {
+            if (optedOut || newDistinctId == distinctId) return null
+            val aliasPayload = if (anonymous) {
+                JSONObject()
+                    .put("alias", distinctId)
+                    .put("distinct_id", newDistinctId)
+                    .also { if (token != null) it.put("token", token) }
+            } else {
+                null
+            }
+            distinctId = newDistinctId
+            anonymous = false
+            storage.set(Keys.DISTINCT_ID, distinctId)
+            storage.set(Keys.ANONYMOUS, "0")
+            // Exposures are per-identity: the new user must report its own.
+            reportedExposures.clear()
+            // Flags are per-identity too: drop the previous identity's values
+            // (memory and disk) BEFORE the new id's reload runs, so they can
+            // never be served to the new identity - including under networkOnly,
+            // where the in-memory set is all there is. The persisted entry is
+            // removed under every policy: identity hygiene, not flag serving.
+            // The seq bump also marks any in-flight reload as stale.
+            flags = emptyMap()
+            flagsLoaded = false
+            flagSource = null
+            flagPersistedAt = null
+            flagRequestSeq += 1
+            storage.set(Keys.FLAGS, null)
+            aliasPayload to flagListeners.values.toList()
         }
-        distinctId = newDistinctId
-        anonymous = false
-        storage.set(Keys.DISTINCT_ID, distinctId)
-        storage.set(Keys.ANONYMOUS, "0")
-        // Exposures are per-identity: the new user must report its own.
-        reportedExposures.clear()
-        aliasPayload
+        // The served set changed to empty: notify listeners outside the
+        // lock, like reloadFeatureFlags, so subscribers drop the previous
+        // identity's values immediately instead of holding them until the
+        // next reload lands.
+        for (listener in listeners) {
+            try {
+                listener(emptyMap())
+            } catch (_: Exception) {
+                // A listener must not break the identity switch for the others.
+            }
+        }
+        return aliasPayload
     }
 
     /** POSTs an /alias payload produced by [setIdentity]. Best effort. */
@@ -239,7 +298,7 @@ class CohorlyCore(
      * assigns a fresh anonymous distinct id. Mirrors mixpanel's reset().
      */
     fun reset() {
-        synchronized(lock) {
+        val listeners = synchronized(lock) {
             distinctId = UUID.randomUUID().toString()
             deviceId = distinctId
             anonymous = true
@@ -255,12 +314,27 @@ class CohorlyCore(
             persistEngageQueue()
             // Flags are per-identity: the previous identity's flags must never
             // be served to the fresh anonymous id, so drop them (memory and
-            // storage) BEFORE asking the server for this id's flags.
+            // storage, under every policy - identity hygiene) BEFORE asking
+            // the server for this id's flags.
             flags = emptyMap()
             flagsLoaded = false
+            flagSource = null
+            flagPersistedAt = null
             flagRequestSeq += 1
             storage.set(Keys.FLAGS, null)
             reportedExposures.clear()
+            flagListeners.values.toList()
+        }
+        // The served set changed to empty: notify listeners outside the
+        // lock, like reloadFeatureFlags, so subscribers drop the previous
+        // identity's values immediately instead of holding them until the
+        // next reload lands.
+        for (listener in listeners) {
+            try {
+                listener(emptyMap())
+            } catch (_: Exception) {
+                // A listener must not break the reset for the others.
+            }
         }
         reloadFeatureFlags()
     }
@@ -273,10 +347,13 @@ class CohorlyCore(
      * [storage] (scoped by distinct id). Blocking, like [flush]: the Android
      * wrapper runs it on its worker thread.
      *
-     * Never throws and never clears the cache on failure - a network error, a
-     * non-2xx response or an unparseable body simply leaves the previously
-     * known flags in place. Results are discarded when the identity changed,
-     * or a newer reload started, while the request was in flight.
+     * Never throws and never clears the served flags on failure - a network
+     * error, a non-2xx response or an unparseable body re-adopts the
+     * persisted cache under the persistent `flagPersistence` modes (a
+     * safety net - it was already adopted at init), and leaves whatever the
+     * network previously served under `networkOnly`. Results are discarded
+     * when the identity changed, or a newer reload started, while the
+     * request was in flight.
      */
     fun reloadFeatureFlags() {
         val (requestedId, seq) = synchronized(lock) {
@@ -290,7 +367,11 @@ class CohorlyCore(
         } catch (_: Exception) {
             null
         }
-        val parsed = parseFlagsResponse(raw) ?: return
+        val parsed = parseFlagsResponse(raw)
+        if (parsed == null) {
+            servePersistedCacheAfterFailure()
+            return
+        }
 
         val listeners = synchronized(lock) {
             // Identity changed, or a newer reload started, while this request
@@ -298,7 +379,11 @@ class CohorlyCore(
             if (requestedId != distinctId || seq != flagRequestSeq) return
             flags = parsed
             flagsLoaded = true
-            persistFlags(requestedId)
+            flagSource = FlagSource.network
+            flagPersistedAt = null
+            if (config.flagPersistence != FlagPersistenceMode.networkOnly) {
+                persistFlags(requestedId)
+            }
             flagListeners.values.toList()
         }
         for (listener in listeners) {
@@ -311,33 +396,59 @@ class CohorlyCore(
     }
 
     /**
+     * Evaluation failed: re-adopt the persisted cache under the persistent
+     * policies. Both persistent modes already adopted it at init, so this is
+     * normally an idempotent safety net (it also covers a cache written
+     * between init and now by another path). Once a network response has
+     * landed this session its values are fresher than any cache the last
+     * success wrote, so they win and the cache is not re-read. `networkOnly`
+     * never touches it. Silent, like the sibling SDKs: a failed reload
+     * notifies nobody.
+     */
+    private fun servePersistedCacheAfterFailure() {
+        synchronized(lock) {
+            if (config.flagPersistence == FlagPersistenceMode.networkOnly ||
+                flagSource == FlagSource.network
+            ) {
+                return
+            }
+            loadPersistedFlagsLocked()
+        }
+    }
+
+    /**
      * The flag's variant when it has one, else its enabled boolean. `false`
      * for an unknown flag or before flags have loaded.
      *
      * Reading a *known* flag also tracks `$feature_flag_called` once per
      * distinct value, per identity (see [exposureFor]).
      */
-    fun getFeatureFlag(key: String): Any {
-        val value: Any
-        val exposure: Any?
-        synchronized(lock) {
-            val flag = flags[key] ?: return false
-            value = flag.variant ?: flag.enabled
-            exposure = exposureFor(key, flag)
-        }
-        trackExposure(key, exposure)
-        return value
-    }
+    fun getFeatureFlag(key: String): Any = getFeatureFlag(key, fallback = false)
+
+    /**
+     * The flag's value, or [fallback] when the flag is unknown or unloaded.
+     *
+     * A read that resolves to [fallback] is not an exposure: nothing was
+     * assigned, so no `$feature_flag_called` is tracked (Mixpanel parity -
+     * fallback variants never fire the exposure event).
+     */
+    fun getFeatureFlag(key: String, fallback: Any): Any = getFeatureFlagDetails(key, fallback).value
 
     /**
      * Whether [key] is enabled. False for an unknown or unloaded flag. Reports
      * an exposure on the same terms as [getFeatureFlag].
      */
-    fun isFeatureEnabled(key: String): Boolean {
+    fun isFeatureEnabled(key: String): Boolean = isFeatureEnabled(key, fallback = false)
+
+    /**
+     * Whether [key] is enabled, or [fallback] when the flag is unknown or
+     * unloaded. A read that resolves to [fallback] reports no exposure.
+     */
+    fun isFeatureEnabled(key: String, fallback: Boolean): Boolean {
         val enabled: Boolean
-        val exposure: Any?
+        val exposure: FlagExposure?
         synchronized(lock) {
-            val flag = flags[key] ?: return false
+            val flag = flags[key] ?: return fallback
             enabled = flag.enabled
             exposure = exposureFor(key, flag)
         }
@@ -346,29 +457,113 @@ class CohorlyCore(
     }
 
     /**
-     * Marks [key] as exposed and returns the `$feature_flag_response` value to
-     * report, or null when nothing should be tracked (exposure events off, or
-     * this key/value pair was already reported for the current identity).
+     * The full lookup result for [key]: the value plus `enabled`, `payload`
+     * and where it came from ([FlagDetails.source] is [FlagSource.network],
+     * [FlagSource.persistence] or [FlagSource.fallback], with `persistedAt`/
+     * `ttlMs` populated for persistence-served values). A fallback result
+     * reports `enabled` = the fallback's truthiness and `payload` = null.
+     *
+     * Reports an exposure on the same terms as [getFeatureFlag]: only a read
+     * of a *known* flag counts, so a result sourced from the fallback never
+     * reports one.
+     */
+    fun getFeatureFlagDetails(key: String, fallback: Any = false): FlagDetails {
+        val details: FlagDetails
+        val exposure: FlagExposure?
+        synchronized(lock) {
+            val flag = flags[key]
+            if (flag == null) {
+                details = FlagDetails(
+                    key = key,
+                    value = fallback,
+                    enabled = truthy(fallback),
+                    payload = null,
+                    source = FlagSource.fallback,
+                )
+                exposure = null
+            } else {
+                val persisted = flagSource == FlagSource.persistence
+                details = FlagDetails(
+                    key = key,
+                    value = flag.variant ?: flag.enabled,
+                    enabled = flag.enabled,
+                    payload = flag.payload,
+                    source = flagSource ?: FlagSource.network,
+                    persistedAt = if (persisted) flagPersistedAt else null,
+                    ttlMs = if (persisted) flagCacheTtlMs else null,
+                )
+                exposure = exposureFor(key, flag)
+            }
+        }
+        trackExposure(key, exposure)
+        return details
+    }
+
+    /**
+     * JavaScript-style truthiness of a fallback, for the `enabled` field of
+     * a fallback [FlagDetails] (the sibling SDKs compute `Boolean(fallback)`):
+     * `true`, non-zero numbers and non-empty strings count as "the feature
+     * is on".
+     */
+    private fun truthy(fallback: Any): Boolean = when (fallback) {
+        is Boolean -> fallback
+        is String -> fallback.isNotEmpty()
+        is Number -> fallback.toDouble() != 0.0
+        else -> false
+    }
+
+    /** Everything a `$feature_flag_called` event needs beyond the flag key. */
+    private data class FlagExposure(
+        val response: Any,
+        val source: FlagSource,
+        val persistedAt: Long?,
+        val ttlMs: Long?,
+    )
+
+    /**
+     * Marks [key] as exposed and returns the `$feature_flag_response` value
+     * plus the provenance to report, or null when nothing should be tracked
+     * (exposure events off, or this key/value pair was already reported for
+     * the current identity). Dedupe keys on (key, value) only, so the same
+     * value served first from persistence and then from the network is
+     * reported exactly once.
      *
      * Must be called while holding [lock].
      */
-    private fun exposureFor(key: String, flag: FlagResult): Any? {
+    private fun exposureFor(key: String, flag: FlagResult): FlagExposure? {
         if (!config.sendExposureEvents) return null
         if (!reportedExposures.add("$key:${flag.variant ?: flag.enabled}")) return null
-        return flag.variant ?: flag.enabled
+        val persisted = flagSource == FlagSource.persistence
+        return FlagExposure(
+            response = flag.variant ?: flag.enabled,
+            source = flagSource ?: FlagSource.network,
+            persistedAt = if (persisted) flagPersistedAt else null,
+            ttlMs = if (persisted) flagCacheTtlMs else null,
+        )
     }
 
     /**
      * Queues the exposure event. Called OUTSIDE [lock] (right after the block
      * that decided it) so the ordering stays lock -> track, never track ->
      * lock, even though Kotlin's `synchronized` would tolerate the nesting.
+     *
+     * `$feature_flag_source` is always stamped ("network" or "persistence"),
+     * matching Mixpanel's always-present `$variant_source`, so dashboards
+     * never have to guess whether a missing property means "network" or
+     * "old SDK". Persistence reads also carry `$feature_flag_persisted_at`
+     * (epoch ms) and `$feature_flag_ttl_ms`, matching the sibling SDKs'
+     * exposure payloads.
      */
-    private fun trackExposure(key: String, response: Any?) {
-        if (response == null) return
-        track(
-            "\$feature_flag_called",
-            mapOf("\$feature_flag" to key, "\$feature_flag_response" to response),
+    private fun trackExposure(key: String, exposure: FlagExposure?) {
+        if (exposure == null) return
+        val properties = mutableMapOf<String, Any>(
+            "\$feature_flag" to key,
+            "\$feature_flag_response" to exposure.response,
+            "\$feature_flag_source" to exposure.source.name,
         )
+        exposure.persistedAt?.let { properties["\$feature_flag_persisted_at"] = it }
+        exposure.ttlMs?.let { properties["\$feature_flag_ttl_ms"] = it }
+        track("\$feature_flag_called", properties)
     }
 
     /** The JSON payload attached to [key], or null when it has none. */
@@ -378,9 +573,22 @@ class CohorlyCore(
     fun getFeatureFlags(): Map<String, FlagResult> = synchronized(lock) { LinkedHashMap(flags) }
 
     /**
-     * Subscribes to flag updates. [listener] fires after every successful
-     * reload, and immediately when flags are already loaded. Returns a function
-     * that removes the subscription.
+     * Whether a flag set is currently being served (a successful network
+     * evaluation or an adopted persisted cache). Goes back to false on
+     * [setIdentity]/[reset] until the new identity's flags land -
+     * subscribers use it to keep serving "unloaded" instead of getter
+     * fallbacks while the next set is still loading.
+     */
+    fun areFeatureFlagsLoaded(): Boolean = synchronized(lock) { flagsLoaded }
+
+    /**
+     * Subscribes to flag updates. [listener] fires whenever the served set
+     * changes: after every successful reload, when [identify]/[reset] drop
+     * the previous identity's flags (with an empty map), and immediately at
+     * subscription when flags are already loaded - including a set adopted
+     * from the persisted cache at startup. A failed reload notifies nobody
+     * (the persisted cache is re-adopted silently, matching the sibling
+     * SDKs). Returns a function that removes the subscription.
      */
     fun onFeatureFlags(listener: (Map<String, FlagResult>) -> Unit): () -> Unit {
         val (id, loaded) = synchronized(lock) {
@@ -397,7 +605,7 @@ class CohorlyCore(
         return { synchronized(lock) { flagListeners.remove(id) } }
     }
 
-    /** Must be called while holding [lock]. */
+    /** Must be called while holding [lock]. Never called under `networkOnly`. */
     private fun persistFlags(forDistinctId: String) {
         val serialized = JSONObject()
         for ((key, flag) in flags) {
@@ -412,8 +620,99 @@ class CohorlyCore(
         }
         storage.set(
             Keys.FLAGS,
-            JSONObject().put("distinct_id", forDistinctId).put("flags", serialized).toString(),
+            JSONObject()
+                .put("distinct_id", forDistinctId)
+                .put("flags", serialized)
+                .put("stored_at", clock.nowMillis())
+                .toString(),
         )
+    }
+
+    /**
+     * Reads the persisted flag cache and installs it as the served set when
+     * it belongs to the current distinct id AND is usable under
+     * [CohorlyConfig.flagPersistence] (see [isFlagCacheUsable]). Returns true
+     * when the cache was served.
+     *
+     * A foreign-identity, too-stale or unparseable entry is dropped, never
+     * served. A legacy cache with no `stored_at` (written before the TTL
+     * existed) cannot be dated, so it is served indefinitely - the
+     * graceful-upgrade path preserving the pre-TTL behavior - until the next
+     * successful reload replaces it with the stamped format. Identity
+     * switches adopt nothing: the single-slot entry is removed by
+     * identify()/reset(), so it can only ever hold the outgoing identity's
+     * cache. Must be called while holding [lock] - the constructor calls it
+     * before the instance is published.
+     */
+    private fun loadPersistedFlagsLocked(): Boolean {
+        val raw = storage.get(Keys.FLAGS)
+        val cache = raw?.let {
+            try {
+                JSONObject(it)
+            } catch (_: Exception) {
+                null
+            }
+        }
+        // isNull covers both a missing key and an explicit JSON null - only
+        // a numeric stored_at is a provable age (typeof === "number" in the
+        // sibling SDKs); anything else is a legacy v1 cache.
+        val storedAt = if (cache != null && !cache.isNull("stored_at")) {
+            cache.optLong("stored_at")
+        } else {
+            null
+        }
+        val parsed = if (cache != null && cache.optString("distinct_id") == distinctId) {
+            parseFlagsResponse(cache.toString())
+        } else {
+            null
+        }
+        if (cache == null || parsed == null || !isFlagCacheUsable(storedAt)) {
+            // Another identity's, too-stale or corrupt: drop it rather than
+            // reporting flags as loaded-and-empty.
+            if (raw != null) storage.set(Keys.FLAGS, null)
+            return false
+        }
+        flags = parsed
+        flagsLoaded = true
+        flagSource = FlagSource.persistence
+        // null for a legacy cache without `stored_at` (unprovable age):
+        // persistedAt stays absent on FlagDetails and the exposure, while
+        // ttlMs is still reported.
+        flagPersistedAt = storedAt
+        // A future stored_at (clock moved backwards after the write) would
+        // stay fresh on every adoption until real time catches up, outliving
+        // the TTL bound. Normalize the stamp to now and rewrite the entry so
+        // subsequent launches age it honestly.
+        if (storedAt != null && storedAt > clock.nowMillis()) {
+            flagPersistedAt = clock.nowMillis()
+            persistFlags(distinctId)
+        }
+        return true
+    }
+
+    /**
+     * True when a persisted cache may be served under
+     * [CohorlyConfig.flagPersistence]. `networkFirst` is strict: only while
+     * `stored_at` is within [CohorlyConfig.flagCacheTtlMs].
+     * `persistenceUntilNetworkSuccess` trades freshness for offline
+     * availability and serves until the wider of `flagCacheTtlMs` and
+     * [FLAG_CACHE_MAX_STALE_MS] (inside the TTL always serves; expired still
+     * serves up to 7 days stale). A legacy cache without `stored_at` has no
+     * provable age: it is served indefinitely, matching the pre-TTL behavior
+     * it was written under.
+     */
+    private fun isFlagCacheUsable(storedAt: Long?): Boolean {
+        if (storedAt == null) return true
+        // A future `stored_at` (clock moved backwards after the write)
+        // yields a negative age that would bypass every bound below; clamp
+        // it to fresh. The stamp itself is normalized to now on adoption
+        // so later launches age it honestly instead of staying fresh until
+        // the clock catches up.
+        val age = maxOf(0L, clock.nowMillis() - storedAt)
+        if (config.flagPersistence == FlagPersistenceMode.networkFirst) {
+            return age <= flagCacheTtlMs
+        }
+        return age <= maxOf(flagCacheTtlMs, FLAG_CACHE_MAX_STALE_MS)
     }
 
     // MARK: super properties

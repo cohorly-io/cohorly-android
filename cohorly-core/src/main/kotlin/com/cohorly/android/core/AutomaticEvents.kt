@@ -28,7 +28,12 @@ internal class AutomaticEvents(
     private val storage: CohorlyStorage,
     private val clock: CohorlyClock,
 ) {
-    private object Keys {
+    /**
+     * `internal`, not private, so [RESTORE_CLEARED_KEYS] can name these
+     * directly. A restored install that kept `did_first_open` would never fire
+     * `$ae_first_open` again on the new device.
+     */
+    internal object Keys {
         const val DID_FIRST_OPEN = "cohorly.ae.did_first_open"
         const val LAST_VERSION = "cohorly.ae.last_version"
     }

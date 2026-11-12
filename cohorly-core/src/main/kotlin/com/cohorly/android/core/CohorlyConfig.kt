@@ -32,4 +32,42 @@ data class CohorlyConfig(
      * of client-side exposure events.
      */
     val sendExposureEvents: Boolean = true,
-)
+    /**
+     * How flag reads resolve values against the persisted cache
+     * (`networkOnly` / `networkFirst` / `persistenceUntilNetworkSuccess`).
+     * Defaults to [FlagPersistenceMode.persistenceUntilNetworkSuccess], which
+     * preserves the pre-policy behavior of always restoring the cache.
+     */
+    val flagPersistence: FlagPersistenceMode = FlagPersistenceMode.persistenceUntilNetworkSuccess,
+    /**
+     * Max age of the persisted flag cache, in ms. Defaults to 24 hours - the
+     * Mixpanel reference default for flag persistence, shared with the
+     * sibling SDKs. How an older cache is treated depends on
+     * [flagPersistence]: `networkFirst` drops it, while
+     * `persistenceUntilNetworkSuccess` still serves it inside
+     * [CohorlyCore.FLAG_CACHE_MAX_STALE_MS] (7 days). A legacy cache with no
+     * `stored_at` has no provable age and is served indefinitely. A
+     * non-positive value falls back to the default.
+     */
+    val flagCacheTtlMs: Long = DEFAULT_FLAG_CACHE_TTL_MS,
+    /**
+     * Native crash reporting (uncaught exceptions, and on API 30+ ANRs,
+     * native crashes and foreground low-memory kills). Default false. When
+     * true, `getInstance` persists the crash config (release
+     * `<applicationId>@<versionName>+<versionCode>`, identity, token, host)
+     * and keeps it current on identify/reset; the reporter starts on the NEXT
+     * launch. False leaves the persisted config alone (a React Native layer
+     * may own it).
+     */
+    val nativeCrashReporting: Boolean = false,
+    /**
+     * In-process ANR watchdog (main thread blocked 5 s in the foreground,
+     * reported as level `error`). Default false. Only used with
+     * [nativeCrashReporting]; takes effect on the next launch.
+     */
+    val anrWatchdog: Boolean = false,
+) {
+    companion object {
+        const val DEFAULT_FLAG_CACHE_TTL_MS: Long = 86_400_000
+    }
+}
