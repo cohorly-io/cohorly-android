@@ -6,6 +6,7 @@ import com.cohorly.android.core.CohorlyTransport
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -29,6 +30,17 @@ import java.util.concurrent.atomic.AtomicLong
  *   never waits on the network.
  * - [uploadExecutor] (`cohorly-replay-upload`) runs `POST /replay` and the
  *   queue changes an answer causes (removal, split).
+ * - [remoteConfig] (with [SessionReplayConfig.remoteConfig]) runs
+ *   `GET /replay/config` on its own thread; the 3 s wait of a pending
+ *   session is a task scheduled on [stateExecutor].
+ *
+ * Remote settings (VEL-2236, same contract as `@cohorly/web`): new sessions
+ * are decided with the project's saved settings over the code's. A session
+ * born while they are being fetched is pending: it has its id at once,
+ * reads [ReplayMode.OFF], and is decided by the answer, the failure or the
+ * 3 s wait, whichever comes first. A pending session restored by a relaunch
+ * is decided the same way. A live session keeps the mode and minimum
+ * duration it was decided with.
  */
 class ReplayController internal constructor(
     val config: SessionReplayConfig,
@@ -45,6 +57,7 @@ class ReplayController internal constructor(
     private val random: () -> Double,
     distinctId: String,
     optedOut: Boolean,
+    private val remoteConfig: ReplayRemoteConfigLoader? = null,
 ) {
     /** Keys of the replay state storage. */
     object Keys {
@@ -105,6 +118,8 @@ class ReplayController internal constructor(
         val mode: ReplayMode,
         val rotatedAt: Long,
         var nextSeq: Long,
+        /** Its recording ended shorter than its minimum duration; its last buffers may still reach it. */
+        var shortRecording: Boolean = false,
     )
 
     private var listenerSeq = 0L
@@ -133,11 +148,67 @@ class ReplayController internal constructor(
     private var retryGeneration = 0L
     private var retryDueAt: Long? = null
 
+    /** The settings new sessions are decided with; null while the remote ones are awaited. Under [lock]. */
+    private var effective: EffectiveReplayConfig? =
+        if (remoteConfig == null) EffectiveReplayConfig.of(config, null) else null
+
+    /** When [effective] was fetched (a fresh copy) or resolved (an answer, or the fallback). Under [lock]. */
+    private var resolvedAt = 0L
+
+    /** The stored copy [effective] was taken from at once (fresh), so it is not taken again. Under [lock]. */
+    private var adopted: StoredReplayConfig? = null
+
+    /** Bumped by each load: an older load resolving late changes nothing. Under [lock]. */
+    private var loads = 0L
+
+    /** A load to start once [lock] is released, with the copy it falls back on. Under [lock]. */
+    private var loadToStart: Load? = null
+
+    private class Load(val id: Long, val base: StoredReplayConfig?)
+
+    /**
+     * Session-mode chunks of a recording kept in memory until it is
+     * [ReplaySession.minDurationMs] long (or over
+     * [MIN_DURATION_HOLD_MAX_BYTES] in UTF-8); never written to disk.
+     */
+    private class Hold(val sessionId: String, val minDurationMs: Long) {
+        val chunks = ArrayList<List<JSONObject>>()
+        private var bytes = 0L
+        private var firstAt: Long? = null
+        private var lastAt: Long? = null
+
+        /**
+         * Holds [events] of [size] UTF-8 bytes (measured by the caller outside the lock, null: measure here); true when the
+         * recording reached the minimum duration (or the size bound).
+         */
+        fun add(events: List<JSONObject>, size: Long?): Boolean {
+            chunks.add(events.toList())
+            bytes += size ?: events.sumOf { it.toString().toByteArray(Charsets.UTF_8).size.toLong() }
+            if (firstAt == null) firstAt = events.firstNotNullOfOrNull(::timestampOf)
+            events.lastOrNull { timestampOf(it) != null }?.let { lastAt = timestampOf(it) }
+            val first = firstAt
+            val last = lastAt
+            return (first != null && last != null && last - first >= minDurationMs) ||
+                bytes > MIN_DURATION_HOLD_MAX_BYTES
+        }
+
+        private fun timestampOf(event: JSONObject): Long? = (event.opt("timestamp") as? Number)?.toLong()
+    }
+
+    /** The session whose hold was last set up; [hold] is null once it needs none (or reached it). Under [lock]. */
+    private var holdSessionId: String? = null
+    private var hold: Hold? = null
+
+    /** The hold of the session the last rotation ended short: its last buffers can still make it long enough. Under [lock]. */
+    private var previousHold: Hold? = null
+
     init {
         queue.onTrimmed = { droppedChunksCount.addAndGet(it.toLong()) }
         // The state file is read here, on the caller's thread, like the core's own storage.
         quotaPausedUntil = state.get(Keys.QUOTA_PAUSED_UNTIL)?.toLongOrNull() ?: 0L
         purgeSessions = parseIds(state.get(Keys.PURGE))
+        // An opted-out boot asks nothing: [optIn] adopts the settings when the person comes back.
+        if (remoteConfig != null && !optedOut) adoptLocked(clock.nowMillis())
         if (optedOut) {
             uploader.stop()
         } else {
@@ -154,8 +225,11 @@ class ReplayController internal constructor(
                 session = if (queuedNext > stored.nextSeq) stored.copy(nextSeq = queuedNext) else stored
                 activityRestored = true
                 if (queuedNext > stored.nextSeq) persistSoon()
+                // Left pending by a launch that ended before deciding it.
+                if (decidePendingLocked(notify = false)) persistSoon()
             }
         }
+        startLoad()
         // On the state thread first, so an opt-out (or a purge the last launch
         // could not finish) is applied before the first upload.
         stateExecutor.execute {
@@ -181,7 +255,9 @@ class ReplayController internal constructor(
     val mode: ReplayMode
         get() {
             if (uploader.disabled) return ReplayMode.OFF
-            val drawn = session?.mode ?: return ReplayMode.OFF
+            val current = session ?: return ReplayMode.OFF
+            if (current.pending) return ReplayMode.OFF
+            val drawn = current.mode
             if (drawn == ReplayMode.SESSION && quotaPaused()) return ReplayMode.ERROR
             return drawn
         }
@@ -206,12 +282,13 @@ class ReplayController internal constructor(
      */
     @CohorlyReplayInternal
     fun enqueue(events: List<JSONObject>, mode: ReplayMode = this.mode, sessionId: String? = null): Boolean {
-        val (chunk, generation) = takeChunk(events, mode, sessionId) ?: return false
+        val (chunks, generation) = takeChunks(events, mode, sessionId) ?: return false
+        if (chunks.isEmpty()) return true
         stateExecutor.execute {
             if (synchronized(lock) { optedOut || generation != optOutGeneration }) return@execute
             // The next seq reaches the state file before the chunk file does.
             persistNow()
-            queue.add(chunk)
+            for (chunk in chunks) queue.add(chunk)
             scheduleDrain(force = false)
         }
         return true
@@ -228,18 +305,24 @@ class ReplayController internal constructor(
      */
     @CohorlyReplayInternal
     fun enqueueNow(events: List<JSONObject>, mode: ReplayMode, sessionId: String?): Boolean = try {
-        val taken = takeChunk(events, mode, sessionId)
-        if (taken == null || synchronized(lock) { optedOut || taken.second != optOutGeneration }) {
+        val taken = takeChunks(events, mode, sessionId)
+        if (taken == null ||
+            taken.first.isEmpty() ||
+            synchronized(lock) { optedOut || taken.second != optOutGeneration }
+        ) {
             false
         } else {
             // The next seq reaches the state file before the chunk file does, like on the state thread.
             persistNow()
-            val written = queue.add(taken.first)
+            var written = true
+            for (chunk in taken.first) written = queue.add(chunk) && written
             // An opt-out that ran meanwhile may have purged before this file
             // landed: remove it ourselves (an opt-out after this check finds
             // the file in its own purge).
             if (written && synchronized(lock) { optedOut || taken.second != optOutGeneration }) {
-                ReplayChunkQueue.parseName(ReplayChunkQueue.nameFor(taken.first))?.let { queue.remove(it) }
+                for (chunk in taken.first) {
+                    ReplayChunkQueue.parseName(ReplayChunkQueue.nameFor(chunk))?.let { queue.remove(it) }
+                }
                 false
             } else {
                 written
@@ -250,54 +333,130 @@ class ReplayController internal constructor(
     }
 
     /**
-     * The chunk [enqueue] and [enqueueNow] queue, with the opt-out
-     * generation it was taken in; null when refused (see [enqueue]).
+     * The chunks [enqueue] and [enqueueNow] queue, in `seq` order, with the
+     * opt-out generation they were taken in; null when refused (see
+     * [enqueue]). Empty when a session-mode chunk is held for the minimum
+     * duration; the chunk that reaches it releases every held one before it.
      */
-    private fun takeChunk(events: List<JSONObject>, mode: ReplayMode, sessionId: String?): Pair<ReplayChunk, Long>? {
+    private fun takeChunks(
+        events: List<JSONObject>,
+        mode: ReplayMode,
+        sessionId: String?,
+    ): Pair<List<ReplayChunk>, Long>? {
         if (events.isEmpty() || mode == ReplayMode.OFF || uploader.disabled) return null
+        // Only remote settings can hold a recording; the serializing stays out of the lock.
+        val size = if (mayHold(mode)) utf8Size(events) else null
         return synchronized(lock) {
             if (optedOut) return null
             val generation = optOutGeneration
             val current = session ?: return null
             if (mode == ReplayMode.SESSION && quotaPaused()) return null
-            val chunk = if (sessionId != null && sessionId != current.id) {
-                previousChunkLocked(sessionId, mode, events) ?: return null
-            } else {
-                session = current.copy(nextSeq = current.nextSeq + 1)
-                ReplayChunk(
-                    sessionId = current.id,
-                    distinctId = distinctId,
-                    seq = current.nextSeq,
-                    mode = mode,
-                    createdAt = clock.nowMillis(),
-                    events = events.toList(),
-                )
+            if (sessionId != null && sessionId != current.id) {
+                val chunks = previousChunksLocked(sessionId, mode, events, size) ?: return null
+                return chunks to generation
             }
-            chunk to generation
+            if (current.pending) return null
+            if (mode != ReplayMode.SESSION || !holdingLocked(current)) {
+                return listOf(nextChunkLocked(events, mode)) to generation
+            }
+            val held = hold!!
+            if (!held.add(events, size)) return emptyList<ReplayChunk>() to generation
+            hold = null
+            held.chunks.map { nextChunkLocked(it, ReplayMode.SESSION) } to generation
         }
     }
 
+    /** Whether a session-mode chunk may join a hold now; a stale answer only costs a measure inside the lock. */
+    private fun mayHold(mode: ReplayMode): Boolean = remoteConfig != null &&
+        mode == ReplayMode.SESSION &&
+        synchronized(lock) {
+            session?.let { it.minDurationMs > 0 && it.nextSeq == 0L } == true || previousHold != null
+        }
+
+    private fun utf8Size(events: List<JSONObject>): Long =
+        events.sumOf { it.toString().toByteArray(Charsets.UTF_8).size.toLong() }
+
+    /** A chunk of the current session with its next `seq`. Must hold [lock]. */
+    private fun nextChunkLocked(events: List<JSONObject>, mode: ReplayMode): ReplayChunk {
+        val current = session!!
+        session = current.copy(nextSeq = current.nextSeq + 1)
+        return ReplayChunk(
+            sessionId = current.id,
+            distinctId = distinctId,
+            seq = current.nextSeq,
+            mode = mode,
+            createdAt = clock.nowMillis(),
+            events = events.toList(),
+        )
+    }
+
     /**
-     * A chunk of the session the last rotation ended, or null when
-     * [sessionId] is not that session or its grace period is over. Takes
-     * its next `seq` like [takeSeqFor] does for a retired session (the
-     * `retiredSeqs` entry moves with it, so the state written before the
-     * chunk holds it). Must hold [lock].
+     * Whether session-mode chunks of [current] are still held. A session
+     * that already queued a chunk (a relaunch continuing it) reached its
+     * minimum duration before. Must hold [lock].
      */
-    private fun previousChunkLocked(sessionId: String, mode: ReplayMode, events: List<JSONObject>): ReplayChunk? {
+    private fun holdingLocked(current: ReplaySession): Boolean {
+        if (holdSessionId != current.id) {
+            holdSessionId = current.id
+            hold =
+                if (current.minDurationMs > 0 &&
+                    current.nextSeq == 0L
+                ) {
+                    Hold(current.id, current.minDurationMs)
+                } else {
+                    null
+                }
+        }
+        return hold != null
+    }
+
+    /**
+     * The chunks of the session the last rotation ended, or null when
+     * [sessionId] is not that session or its grace period is over. Each
+     * takes its next `seq` like [takeSeqFor] does for a retired session (the
+     * `retiredSeqs` entry moves with it, so the state written before the
+     * chunk holds it). A session-mode chunk of a recording that ended short
+     * joins its hold: empty until the hold reaches the minimum duration,
+     * then every held chunk in order. Must hold [lock].
+     */
+    private fun previousChunksLocked(
+        sessionId: String,
+        mode: ReplayMode,
+        events: List<JSONObject>,
+        size: Long?,
+    ): List<ReplayChunk>? {
         val prev = previous ?: return null
-        val current = session ?: return null
+        if (session == null) return null
         val now = clock.nowMillis()
         if (prev.id != sessionId || prev.mode == ReplayMode.OFF) return null
         if (now - prev.rotatedAt > PREVIOUS_SESSION_GRACE_MS) {
             previous = null
+            previousHold = null
             return null
         }
-        val seq = maxOf(prev.nextSeq, current.retiredSeqs[sessionId] ?: 0L)
+        if (prev.shortRecording && mode == ReplayMode.SESSION) {
+            val held = previousHold?.takeIf { it.sessionId == sessionId } ?: return null
+            if (!held.add(events, size)) return emptyList()
+            previousHold = null
+            prev.shortRecording = false
+            return held.chunks.map { previousChunkLocked(prev, ReplayMode.SESSION, it, now) }
+        }
+        return listOf(previousChunkLocked(prev, mode, events, now))
+    }
+
+    /** One chunk of [prev] with its next `seq`. Must hold [lock]. */
+    private fun previousChunkLocked(
+        prev: PreviousSession,
+        mode: ReplayMode,
+        events: List<JSONObject>,
+        now: Long,
+    ): ReplayChunk {
+        val current = session!!
+        val seq = maxOf(prev.nextSeq, current.retiredSeqs[prev.id] ?: 0L)
         prev.nextSeq = seq + 1
-        session = current.copy(retiredSeqs = current.retiredSeqs + (sessionId to seq + 1))
+        session = current.copy(retiredSeqs = current.retiredSeqs + (prev.id to seq + 1))
         return ReplayChunk(
-            sessionId = sessionId,
+            sessionId = prev.id,
             distinctId = prev.distinctId,
             seq = seq,
             mode = mode,
@@ -307,8 +466,9 @@ class ReplayController internal constructor(
     }
 
     /**
-     * Calls [listener] with the new session id on every rotation, and with
-     * null on opt-out, in rotation order, on the state thread
+     * Calls [listener] with the new session id on every rotation, with the
+     * current id again when a pending session is decided (its mode may now
+     * record), and with null on opt-out, in order, on the state thread
      * (`cohorly-replay`), which never waits on an upload. Returns the
      * function that removes it.
      */
@@ -389,6 +549,7 @@ class ReplayController internal constructor(
         }
         if (persist) persistSoon()
         deliverSoon()
+        startLoad()
         return id
     }
 
@@ -411,6 +572,7 @@ class ReplayController internal constructor(
         }
         persistSoon()
         deliverSoon()
+        startLoad()
     }
 
     internal fun onBackground() {
@@ -438,6 +600,7 @@ class ReplayController internal constructor(
         }
         persistSoon()
         deliverSoon()
+        startLoad()
     }
 
     /**
@@ -452,6 +615,9 @@ class ReplayController internal constructor(
             optOutGeneration++
             session = null
             previous = null
+            holdSessionId = null
+            hold = null
+            previousHold = null
         }
         uploader.stop()
         stateExecutor.execute {
@@ -466,6 +632,7 @@ class ReplayController internal constructor(
         synchronized(lock) {
             if (!optedOut) return
             optedOut = false
+            if (remoteConfig != null && loads == 0L) adoptLocked(clock.nowMillis())
             session = newSession(clock.nowMillis(), null)
             previous = null
             activityRestored = false
@@ -473,6 +640,7 @@ class ReplayController internal constructor(
         }
         persistSoon()
         deliverSoon()
+        startLoad()
         stateExecutor.execute {
             purge(all = false)
             if (!isOptedOut()) {
@@ -488,7 +656,10 @@ class ReplayController internal constructor(
 
     private fun quotaPaused(): Boolean = clock.nowMillis() < quotaPausedUntil
 
+    /** Called under [lock] (or from the constructor). */
     private fun newSession(now: Long, previous: ReplaySession?): ReplaySession {
+        refreshIfStaleLocked(now)
+        val decided = effective
         val retired = LinkedHashMap<String, Long>()
         if (previous != null) {
             retired.putAll(previous.retiredSeqs)
@@ -501,17 +672,133 @@ class ReplayController internal constructor(
             startedAt = now,
             lastActiveAt = now,
             backgroundedAt = null,
-            mode = ReplaySession.draw(config, random),
+            mode = decided?.let { ReplaySession.draw(it.sampleRate, it.onErrorSampleRate, random) } ?: ReplayMode.OFF,
             nextSeq = 0,
             retiredSeqs = retired,
+            pending = decided == null,
+            minDurationMs = decided?.minDurationMs ?: 0L,
         )
+    }
+
+    // MARK: remote settings
+
+    /**
+     * Takes the stored copy when it is fresh (no request); otherwise new
+     * sessions wait for a load, started by [startLoad] once the lock is
+     * released. Must hold [lock] (or run in the constructor).
+     */
+    private fun adoptLocked(now: Long) {
+        val remote = remoteConfig ?: return
+        val stored = remote.stored()
+        if (stored != null && stored.fresh(now)) {
+            effective = EffectiveReplayConfig.of(config, stored.config)
+            resolvedAt = stored.fetchedAt
+            adopted = stored
+            loads += 1
+            loadToStart = null
+            return
+        }
+        effective = null
+        loads += 1
+        loadToStart = Load(loads, stored)
+    }
+
+    /**
+     * Before a new session is decided: loads the settings again when they
+     * were resolved an hour ago or more, or a newer copy was stored since
+     * (an answer that arrived after its 3 s wait). Must hold [lock].
+     */
+    private fun refreshIfStaleLocked(now: Long) {
+        val remote = remoteConfig ?: return
+        if (effective == null) return
+        val copy = remote.stored()
+        if (now - resolvedAt >= ReplayRemoteConfigLoader.REPLAY_CONFIG_TTL_MS ||
+            (copy != null && copy !== adopted)
+        ) {
+            adoptLocked(now)
+        }
+    }
+
+    /**
+     * Starts the load [adoptLocked] asked for: the request on the config
+     * thread and the 3 s wait on the state thread. The first to finish
+     * resolves it; a failure or the wait fall back on the stored copy (even
+     * expired), else on the code. Never blocks.
+     */
+    private fun startLoad() {
+        val remote = remoteConfig ?: return
+        val load = synchronized(lock) { loadToStart.also { loadToStart = null } } ?: return
+        val done = AtomicBoolean(false)
+        val finish = { answer: RemoteReplayConfig? ->
+            if (!done.getAndSet(true)) stateExecutor.execute { resolveLoad(load, answer) }
+        }
+        val startedAt = clock.nowMillis()
+        stateExecutor.schedule(ReplayRemoteConfigLoader.REPLAY_CONFIG_TIMEOUT_MS) { finish(null) }
+        remote.load { answer ->
+            // Past the wait, even if the timer has not run yet (a busy state thread), the answer only updates the copy.
+            finish(answer?.takeIf { clock.nowMillis() - startedAt < ReplayRemoteConfigLoader.REPLAY_CONFIG_TIMEOUT_MS })
+        }
+    }
+
+    /** On the state thread: [load]'s settings decide new sessions and the pending one. */
+    private fun resolveLoad(load: Load, answer: RemoteReplayConfig?) {
+        val decided = synchronized(lock) {
+            if (load.id != loads) return
+            effective = EffectiveReplayConfig.of(config, answer ?: load.base?.config)
+            resolvedAt = clock.nowMillis()
+            // The copy the decision rests on: any other one stored later is a late answer for the next session.
+            adopted = if (answer != null) remoteConfig?.stored() else load.base
+            decidePendingLocked(notify = true)
+        }
+        if (decided) persistNow()
+        deliverSoon()
+    }
+
+    /**
+     * Decides the current session when it is pending and the settings are
+     * known. True when it did. Must hold [lock] (or run in the constructor).
+     */
+    private fun decidePendingLocked(notify: Boolean): Boolean {
+        val decided = effective ?: return false
+        val current = session ?: return false
+        if (!current.pending) return false
+        session = current.copy(
+            pending = false,
+            mode = ReplaySession.draw(decided.sampleRate, decided.onErrorSampleRate, random),
+            minDurationMs = decided.minDurationMs,
+        )
+        if (holdSessionId == current.id) {
+            holdSessionId = null
+            hold = null
+        }
+        if (notify) pendingNotifications.addLast(Notification(current.id))
+        return true
     }
 
     /** Must hold [lock]. [endedDistinctId] is the identity the ending session's chunks carry. */
     private fun rotateLocked(now: Long, endedDistinctId: String = distinctId) {
         val ended = session
         val next = newSession(now, ended)
-        previous = ended?.let { PreviousSession(it.id, endedDistinctId, it.mode, now, it.nextSeq) }
+        // A recording that ends shorter than its minimum duration sends nothing and takes no seq,
+        // unless the recorder's last buffers of it, within the grace period, make it long enough.
+        val short = ended != null &&
+            ended.minDurationMs > 0 &&
+            if (holdSessionId == ended.id) hold != null else ended.nextSeq == 0L
+        previousHold = if (short && ended != null) {
+            hold?.takeIf { holdSessionId == ended.id } ?: Hold(ended.id, ended.minDurationMs)
+        } else {
+            null
+        }
+        holdSessionId = null
+        hold = null
+        val retiring = ended?.let { PreviousSession(it.id, endedDistinctId, it.mode, now, it.nextSeq, short) }
+        previous = retiring
+        if (previousHold != null) {
+            // Once the grace period is over no late buffer can come: free the held chunks now, not at the next rotation.
+            stateExecutor.schedule(PREVIOUS_SESSION_GRACE_MS + 1) {
+                synchronized(lock) { if (previous === retiring) previousHold = null }
+            }
+        }
         session = next
         lastPersistedActivity = now
         activityRestored = false
@@ -670,5 +957,8 @@ class ReplayController internal constructor(
 
         /** How long after a rotation [enqueue] still accepts a chunk of the session it ended. */
         const val PREVIOUS_SESSION_GRACE_MS = 60_000L
+
+        /** Held session-mode chunks over this many bytes (their JSON in UTF-8) are sent even if the recording is short. */
+        const val MIN_DURATION_HOLD_MAX_BYTES = 5L * 1024 * 1024
     }
 }

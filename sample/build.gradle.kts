@@ -21,6 +21,8 @@ val sampleCaptureMode = ((findProperty("cohorlySampleCaptureMode") as String?) ?
 // buffer on a crash (the "Crash" button) from the launch after the first one.
 val sampleRate = (findProperty("cohorlySampleRate") as String?)?.toDoubleOrNull() ?: 1.0
 val sampleOnErrorRate = (findProperty("cohorlySampleOnErrorRate") as String?)?.toDoubleOrNull() ?: 1.0
+// Dashboard replay settings (VEL-2236): -PcohorlySampleRemoteConfig=true
+val sampleRemoteConfig = (findProperty("cohorlySampleRemoteConfig") as String?)?.toBoolean() ?: false
 val sampleCrashReporting = (findProperty("cohorlySampleCrashReporting") as String?)?.toBoolean() ?: true
 
 android {
@@ -37,6 +39,7 @@ android {
         buildConfigField("String", "COHORLY_TOKEN", "\"$sampleToken\"")
         buildConfigField("double", "REPLAY_SAMPLE_RATE", "$sampleRate")
         buildConfigField("double", "REPLAY_ON_ERROR_SAMPLE_RATE", "$sampleOnErrorRate")
+        buildConfigField("boolean", "REPLAY_REMOTE_CONFIG", "$sampleRemoteConfig")
         buildConfigField("boolean", "NATIVE_CRASH_REPORTING", "$sampleCrashReporting")
         buildConfigField("String", "COHORLY_CAPTURE_MODE", "\"$sampleCaptureMode\"")
     }

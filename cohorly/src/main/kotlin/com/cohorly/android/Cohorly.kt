@@ -83,6 +83,10 @@ class Cohorly private constructor(
                 val replayStore = config.sessionReplay?.let { FileReplayChunkStore(replayDir) }
                 // The replay session, seq counters and quota pause, apart from the event file.
                 val replayState = config.sessionReplay?.let { JsonFileStorage(File(replayDir, "state.json")) }
+                // The last answer of GET /replay/config, only with remoteConfig.
+                val replayRemoteConfig = config.sessionReplay?.takeIf { it.remoteConfig }?.let {
+                    JsonFileStorage(File(replayDir, "remote_config.json"))
+                }
                 // getInstance runs on the caller's thread, normally the main
                 // one. On a fresh install the core's constructor persists the
                 // distinct id, the anonymous flag and the device id; batching
@@ -99,6 +103,7 @@ class Cohorly private constructor(
                         libVersion = AndroidDeviceInfo.LIB_VERSION,
                         replayChunkStore = replayStore,
                         replayStateStorage = replayState,
+                        replayRemoteConfigStorage = replayRemoteConfig,
                     )
                 }
                 val executor = Executors.newSingleThreadScheduledExecutor { runnable ->
@@ -137,6 +142,30 @@ class Cohorly private constructor(
                                 core.onAppBackgrounded()
                                 core.maybeFlush()
                             }
+                        },
+                        // Callbacks arrive on the main thread, where the Activity is
+                        // alive: the dedupe runs there (cheap, under a lock, with
+                        // isChangingConfigurations read at the callback), and only
+                        // the resulting track goes to the worker. A busy worker
+                        // therefore never loses a screen or a recreation and never
+                        // holds the Activity. Only wired when the option is on.
+                        onScreenResumed = if (config.trackScreenViews) {
+                            { activity ->
+                                core.resolveScreen(activity)?.let { name ->
+                                    val at = core.nowMillis()
+                                    executor.execute {
+                                        core.trackScreen(name, at)
+                                        instance.flushIfBatchReady()
+                                    }
+                                }
+                            }
+                        } else {
+                            {}
+                        },
+                        onScreenLeft = if (config.trackScreenViews) {
+                            { activity, changing -> core.onScreenLeft(activity, changing) }
+                        } else {
+                            { _, _ -> }
                         },
                     ),
                 )

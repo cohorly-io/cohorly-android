@@ -12,6 +12,12 @@ import org.json.JSONObject
  * [retiredSeqs] keeps the next `seq` of earlier sessions that may still have
  * chunks in the queue, so splitting one of those chunks after a rotation
  * still takes a `seq` that session never used.
+ *
+ * With remote settings (VEL-2236), [pending] marks a session born before
+ * they were known: it records nothing ([mode] is OFF) until they decide it.
+ * [minDurationMs] is decided with the mode and kept for the session. Both
+ * are written only when set, so a record from an older build reads as a
+ * decided session with no minimum duration.
  */
 data class ReplaySession(
     val id: String,
@@ -21,6 +27,8 @@ data class ReplaySession(
     val mode: ReplayMode,
     val nextSeq: Long,
     val retiredSeqs: Map<String, Long> = emptyMap(),
+    val pending: Boolean = false,
+    val minDurationMs: Long = 0L,
 ) {
     /** 30 min or more in background, measured at [now]. */
     fun backgroundExpired(now: Long): Boolean = backgroundedAt != null && now - backgroundedAt >= IDLE_TIMEOUT_MS
@@ -60,6 +68,8 @@ data class ReplaySession(
         if (retiredSeqs.isNotEmpty()) {
             put("retired_seqs", JSONObject().apply { for ((k, v) in retiredSeqs) put(k, v) })
         }
+        if (pending) put("pending", true)
+        if (minDurationMs > 0) put("min_duration_ms", minDurationMs)
     }.toString()
 
     companion object {
@@ -96,6 +106,11 @@ data class ReplaySession(
                     mode = ReplayMode.fromWire(obj.optString("mode")),
                     nextSeq = obj.getLong("next_seq").coerceAtLeast(0),
                     retiredSeqs = retired,
+                    pending = obj.optBoolean("pending", false),
+                    minDurationMs = obj.optLong(
+                        "min_duration_ms",
+                        0L,
+                    ).coerceIn(0L, RemoteReplayConfig.MAX_MIN_DURATION_MS),
                 )
             } catch (_: Exception) {
                 null
@@ -107,9 +122,12 @@ data class ReplaySession(
          * first draw falls under `sampleRate`, else `error` when a second one
          * falls under `onErrorSampleRate`, else off. [random] is in [0, 1).
          */
-        fun draw(config: SessionReplayConfig, random: () -> Double): ReplayMode = when {
-            random() < config.sampleRate -> ReplayMode.SESSION
-            random() < config.onErrorSampleRate -> ReplayMode.ERROR
+        fun draw(config: SessionReplayConfig, random: () -> Double): ReplayMode =
+            draw(config.sampleRate, config.onErrorSampleRate, random)
+
+        fun draw(sampleRate: Double, onErrorSampleRate: Double, random: () -> Double): ReplayMode = when {
+            random() < sampleRate -> ReplayMode.SESSION
+            random() < onErrorSampleRate -> ReplayMode.ERROR
             else -> ReplayMode.OFF
         }
     }

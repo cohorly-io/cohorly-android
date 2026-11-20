@@ -13,7 +13,6 @@ class MainActivity : Activity() {
         setContentView(R.layout.activity_main)
         applySystemBarInsets(findViewById<View>(R.id.content_root))
         val cohorly = (application as SampleApplication).cohorly
-        cohorly.track("\$screen", mapOf("\$screen_name" to "MainActivity"))
 
         findViewById<Button>(R.id.open_dialog).setOnClickListener {
             cohorly.track("Dialog Opened")

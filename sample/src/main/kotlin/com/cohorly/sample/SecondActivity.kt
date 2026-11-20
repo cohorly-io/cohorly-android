@@ -10,7 +10,6 @@ import android.widget.TextView
 class SecondActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        (application as SampleApplication).cohorly.track("\$screen", mapOf("\$screen_name" to "SecondActivity"))
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER

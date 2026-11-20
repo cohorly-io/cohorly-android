@@ -25,7 +25,7 @@ import com.cohorly.android.core.DeviceInfoProvider
 class AndroidDeviceInfo(private val context: Context) : DeviceInfoProvider {
     companion object {
         /** SDK version, sent as `$lib_version` on every event. */
-        const val LIB_VERSION = "0.4.0"
+        const val LIB_VERSION = "0.5.0"
     }
 
     /** Properties that cannot change during the process lifetime. */

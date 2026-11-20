@@ -45,6 +45,11 @@ enum class ReplayCaptureMode {
  * - [maskAllImages]: images are replaced by placeholders in the recording.
  * - [captureMode]: wireframes (default) or masked screenshots.
  * - [screenshotQuality]: WebP quality of a screenshot, 0 to 100 (clamped).
+ * - [remoteConfig]: the project's saved `sampleRate`, `onErrorSampleRate`
+ *   and `minDurationMs` (`GET /replay/config`) win field by field over the
+ *   code's for new sessions. Default false: no request is made. Saved
+ *   triggers are web only and ignored here; masking, capture mode and
+ *   quality always come from the code.
  *
  * Rates outside [0, 1] are clamped; NaN reads as 0.
  */
@@ -54,6 +59,7 @@ class SessionReplayConfig(
     val maskAllImages: Boolean = true,
     val captureMode: ReplayCaptureMode = ReplayCaptureMode.WIREFRAME,
     screenshotQuality: Int = DEFAULT_SCREENSHOT_QUALITY,
+    val remoteConfig: Boolean = false,
 ) {
     val sampleRate: Double = clampRate(sampleRate)
     val onErrorSampleRate: Double = clampRate(onErrorSampleRate)
@@ -64,17 +70,19 @@ class SessionReplayConfig(
         other.onErrorSampleRate == onErrorSampleRate &&
         other.maskAllImages == maskAllImages &&
         other.captureMode == captureMode &&
-        other.screenshotQuality == screenshotQuality
+        other.screenshotQuality == screenshotQuality &&
+        other.remoteConfig == remoteConfig
 
     override fun hashCode(): Int {
         var result = (sampleRate.hashCode() * 31 + onErrorSampleRate.hashCode()) * 31 + maskAllImages.hashCode()
         result = result * 31 + captureMode.hashCode()
-        return result * 31 + screenshotQuality
+        result = result * 31 + screenshotQuality
+        return result * 31 + remoteConfig.hashCode()
     }
 
     override fun toString(): String = "SessionReplayConfig(sampleRate=$sampleRate, " +
         "onErrorSampleRate=$onErrorSampleRate, maskAllImages=$maskAllImages, " +
-        "captureMode=$captureMode, screenshotQuality=$screenshotQuality)"
+        "captureMode=$captureMode, screenshotQuality=$screenshotQuality, remoteConfig=$remoteConfig)"
 
     companion object {
         const val DEFAULT_SCREENSHOT_QUALITY = 30

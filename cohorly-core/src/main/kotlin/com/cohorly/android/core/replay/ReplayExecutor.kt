@@ -37,5 +37,8 @@ class ThreadReplayExecutor(private val name: String = STATE_THREAD) : ReplayExec
 
         /** `POST /replay` and the queue changes its answers cause. */
         const val UPLOAD_THREAD = "cohorly-replay-upload"
+
+        /** `GET /replay/config`, with [SessionReplayConfig.remoteConfig]. */
+        const val CONFIG_THREAD = "cohorly-replay-config"
     }
 }

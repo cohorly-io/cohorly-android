@@ -42,7 +42,6 @@ import com.cohorly.android.replay.compose.cohorlyNoCapture
 class ComposeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        (application as SampleApplication).cohorly.track("\$screen", mapOf("\$screen_name" to "ComposeActivity"))
         setContent { MaterialTheme { SampleScreen(onBack = ::finish) } }
     }
 }

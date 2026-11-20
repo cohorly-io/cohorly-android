@@ -75,6 +75,15 @@ data class CohorlyConfig(
      * crash reporter records) carries the current `$session_id`.
      */
     val sessionReplay: SessionReplayConfig? = null,
+    /**
+     * Tracks a `$screen` event (property `$screen_name`, the Activity's simple
+     * class name) each time an Activity becomes visible. Off by default and
+     * independent of session replay: turning replay on never turns this on.
+     * Each `$screen` counts against the monthly event quota like any `track`.
+     * Fragments and Navigation Compose destinations are not tracked. Last in
+     * the list so positional callers of earlier versions keep their meaning.
+     */
+    val trackScreenViews: Boolean = false,
 ) {
     companion object {
         const val DEFAULT_FLAG_CACHE_TTL_MS: Long = 86_400_000

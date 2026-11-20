@@ -125,6 +125,9 @@ fun replayCore(
     random: () -> Double = { 0.5 },
     maxRetryDelayMs: Long = 600_000,
     jitter: () -> Double = { 0.0 },
+    remoteConfigStorage: CohorlyStorage = InMemoryStorage(),
+    configFetcher: ReplayConfigFetcher = MockReplayConfigFetcher(),
+    configExecutor: ReplayExecutor = TestReplayExecutor(),
 ): CohorlyCore = makeCore(
     storage = storage,
     transport = transport,
@@ -136,6 +139,9 @@ fun replayCore(
     replayExecutor = executor,
     replayUploadExecutor = uploadExecutor,
     replayRandom = random,
+    replayRemoteConfigStorage = remoteConfigStorage,
+    replayConfigFetcher = configFetcher,
+    replayConfigExecutor = configExecutor,
 )
 
 val CohorlyCore.replayController: ReplayController get() = requireNotNull(replay) { "session replay is off" }
@@ -154,3 +160,27 @@ fun MockTransport.BytesPost.chunk(): JSONObject = JSONObject(String(ReplayChunkQ
 fun MockTransport.replayChunks(): List<JSONObject> = bytePosts.filter { it.url.endsWith("/replay") }.map { it.chunk() }
 
 fun JSONObject.props(): JSONObject = getJSONObject("properties")
+
+/**
+ * `GET /replay/config` for tests: answers [body] (a 2xx body, null for a
+ * non-2xx status), or throws [error]. Records every URL it was called with.
+ */
+class MockReplayConfigFetcher(var body: String? = """{"config":{}}""", var error: Throwable? = null) :
+    ReplayConfigFetcher {
+    val urls = mutableListOf<String>()
+
+    /** Runs inside each fetch, before it answers (e.g. to move the clock). */
+    var during: () -> Unit = {}
+
+    override fun fetch(url: String): String? {
+        urls.add(url)
+        during()
+        error?.let { throw it }
+        return body
+    }
+
+    val calls: Int get() = urls.size
+}
+
+/** A `GET /replay/config` body carrying [config]. */
+fun remoteBody(config: String): String = """{"config":$config}"""

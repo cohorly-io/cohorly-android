@@ -9,8 +9,14 @@ import android.os.Bundle
  * (no androidx.lifecycle dependency). Configuration changes (rotation) do
  * not produce a background/foreground edge.
  */
-internal class LifecycleWatcher(private val onForeground: () -> Unit, private val onBackground: () -> Unit) :
-    Application.ActivityLifecycleCallbacks {
+internal class LifecycleWatcher(
+    private val onForeground: () -> Unit,
+    private val onBackground: () -> Unit,
+    /** Activity became visible (resumed); feeds `trackScreenViews`. Runs on the main thread. */
+    private val onScreenResumed: (Activity) -> Unit = {},
+    /** Activity paused or destroyed, with its `isChangingConfigurations` read on the main thread. */
+    private val onScreenLeft: (Activity, Boolean) -> Unit = { _, _ -> },
+) : Application.ActivityLifecycleCallbacks {
     private var startedCount = 0
     private var changingConfigurations = false
 
@@ -27,8 +33,8 @@ internal class LifecycleWatcher(private val onForeground: () -> Unit, private va
     }
 
     override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
-    override fun onActivityResumed(activity: Activity) {}
-    override fun onActivityPaused(activity: Activity) {}
+    override fun onActivityResumed(activity: Activity) = onScreenResumed(activity)
+    override fun onActivityPaused(activity: Activity) = onScreenLeft(activity, activity.isChangingConfigurations)
     override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
-    override fun onActivityDestroyed(activity: Activity) {}
+    override fun onActivityDestroyed(activity: Activity) = onScreenLeft(activity, activity.isChangingConfigurations)
 }

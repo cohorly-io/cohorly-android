@@ -1,6 +1,8 @@
 package com.cohorly.android.core
 
+import com.cohorly.android.core.replay.MockReplayConfigFetcher
 import com.cohorly.android.core.replay.ReplayChunkStore
+import com.cohorly.android.core.replay.ReplayConfigFetcher
 import com.cohorly.android.core.replay.ReplayExecutor
 import org.json.JSONArray
 import org.json.JSONObject
@@ -111,6 +113,9 @@ fun makeCore(
     replayExecutor: ReplayExecutor? = null,
     replayUploadExecutor: ReplayExecutor? = null,
     replayRandom: () -> Double = { 0.5 },
+    replayRemoteConfigStorage: CohorlyStorage? = null,
+    replayConfigFetcher: ReplayConfigFetcher = MockReplayConfigFetcher(),
+    replayConfigExecutor: ReplayExecutor? = null,
 ): CohorlyCore = CohorlyCore(
     apiHost = apiHost,
     token = token,
@@ -127,4 +132,7 @@ fun makeCore(
     replayExecutor = replayExecutor,
     replayUploadExecutor = replayUploadExecutor,
     replayRandom = replayRandom,
+    replayRemoteConfigStorage = replayRemoteConfigStorage,
+    replayConfigFetcher = replayConfigFetcher,
+    replayConfigExecutor = replayConfigExecutor,
 )

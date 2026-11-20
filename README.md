@@ -38,7 +38,7 @@ dependencyResolutionManagement {
 
 // app/build.gradle.kts
 dependencies {
-    implementation("com.github.cohorly-io.cohorly-android:cohorly-android:v0.4.0")
+    implementation("com.github.cohorly-io.cohorly-android:cohorly-android:v0.5.0")
 }
 ```
 
@@ -51,7 +51,7 @@ cd sdks/android
 
 ```kotlin
 dependencies {
-    implementation("com.cohorly:cohorly-android:0.4.0") // mavenLocal()
+    implementation("com.cohorly:cohorly-android:0.5.0") // mavenLocal()
 }
 ```
 
@@ -190,6 +190,33 @@ and React Native SDKs):
 Foreground/background detection uses `Application.ActivityLifecycleCallbacks`
 (no androidx dependency); configuration changes don't split sessions.
 `$ae_crashed` is not implemented (parity with the other Cohorly SDKs).
+
+## Screen views
+
+`CohorlyConfig(trackScreenViews = true)` (default **false**, independent of
+session replay: turning replay on never turns it on) tracks a `$screen` event
+each time an Activity becomes visible. Its only own property is
+`$screen_name`, the Activity's simple class name (`CheckoutActivity`), the same
+name the replay writes in the Meta `href`. The event goes through `track`, so it carries the default and
+super properties and `$session_id` in a recorded session.
+
+- No event on a return from background, a dismissed dialog or back from
+  another app (the Activity that produced the last `$screen` does not
+  produce another one), nor on a rotation or other configuration change.
+- Going back to a previous Activity (A -> B -> back -> A) tracks A again, and
+  so does a new instance of the same class.
+- Fragments and Navigation Compose destinations are not tracked: track
+  `$screen` by hand for those (`track("\$screen", mapOf("\$screen_name" to "Cart"))`).
+- Every Activity of the process counts, including transparent ones opened by
+  libraries (billing, sign-in): each one, and the return to the caller after
+  it, is a `$screen`.
+- After process death (or "Don't keep activities"), returning to the app
+  recreates the Activity and tracks a `$screen`.
+- On Android 7 to 9 in multi-window, only the focused Activity is resumed, so
+  each focus change between the two visible Activities tracks a `$screen`
+  (Android 10 and later keep both resumed and do not).
+- Every `$screen` counts against the monthly event quota like any other
+  event.
 
 ## Feature flags
 
@@ -336,9 +363,9 @@ app without it carries no replay code:
 ```kotlin
 // app/build.gradle.kts
 dependencies {
-    implementation("com.github.cohorly-io.cohorly-android:cohorly-android:v0.4.0")
-    implementation("com.github.cohorly-io.cohorly-android:cohorly-android-replay:v0.4.0")
-    // or, from mavenLocal(): com.cohorly:cohorly-android-replay:0.4.0
+    implementation("com.github.cohorly-io.cohorly-android:cohorly-android:v0.5.0")
+    implementation("com.github.cohorly-io.cohorly-android:cohorly-android-replay:v0.5.0")
+    // or, from mavenLocal(): com.cohorly:cohorly-android-replay:0.5.0
 }
 ```
 
@@ -452,6 +479,20 @@ entry-level devices before turning `sampleRate` up in production.
   kills read from `ApplicationExitInfo` on the next launch do **not** carry
   it: their values come from the 128-byte process state summary, which is
   already full.
+- **Settings from the dashboard.** With
+  `SessionReplayConfig(sampleRate = 0.0, remoteConfig = true)`, the rates and
+  the minimum duration saved in Settings > Session replay apply without a new
+  release. Each field the project saved wins over the same field in your
+  code; a field it never saved keeps your code's value, and with no network
+  and no stored copy your code's values apply. Masking and capture mode
+  always come from your code. The SDK keeps the settings for up to 1 hour
+  (`remote_config.json` next to `state.json`) and a change applies to new
+  sessions only. A new session gets its `$session_id` at once and records
+  nothing until the settings arrive, at most 3 seconds later. With a minimum
+  duration, a fully recorded session sends nothing until it is that long; a
+  shorter one is never sent and never counts toward the quota (error mode is
+  always sent). Triggers are web only. Without `remoteConfig` (the default)
+  the SDK never asks.
 - **Session rotation.** A new session (new id, a new sampling draw) starts on
   the first foreground after 30 minutes in background, on the first activity
   (a tracked event or a recorded touch) after 30 minutes in foreground without

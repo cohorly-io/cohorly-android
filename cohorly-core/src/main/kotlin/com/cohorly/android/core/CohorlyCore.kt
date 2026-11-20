@@ -1,10 +1,13 @@
 package com.cohorly.android.core
 
+import com.cohorly.android.core.replay.HttpUrlConnectionReplayConfigFetcher
 import com.cohorly.android.core.replay.InMemoryReplayChunkStore
 import com.cohorly.android.core.replay.ReplayChunkQueue
 import com.cohorly.android.core.replay.ReplayChunkStore
+import com.cohorly.android.core.replay.ReplayConfigFetcher
 import com.cohorly.android.core.replay.ReplayController
 import com.cohorly.android.core.replay.ReplayExecutor
+import com.cohorly.android.core.replay.ReplayRemoteConfigLoader
 import com.cohorly.android.core.replay.ThreadReplayExecutor
 import org.json.JSONArray
 import org.json.JSONObject
@@ -62,6 +65,17 @@ class CohorlyCore(
     replayUploadExecutor: ReplayExecutor? = null,
     /** Sampling draws in [0, 1); injectable for deterministic replay tests. */
     replayRandom: () -> Double = { Random.nextDouble() },
+    /**
+     * The stored copy of the remote replay settings (the Android module
+     * passes `no_backup/cohorly_replay_<token>/remote_config.json`); only
+     * used with [com.cohorly.android.core.replay.SessionReplayConfig.remoteConfig].
+     * Null keeps it in memory.
+     */
+    replayRemoteConfigStorage: CohorlyStorage? = null,
+    /** `GET /replay/config`; injectable for tests. */
+    replayConfigFetcher: ReplayConfigFetcher = HttpUrlConnectionReplayConfigFetcher(),
+    /** The thread that runs [replayConfigFetcher]; null starts `cohorly-replay-config` when needed. */
+    replayConfigExecutor: ReplayExecutor? = null,
 ) {
     /**
      * Storage keys. `internal` rather than private so InstallGuard.kt can clear
@@ -144,6 +158,8 @@ class CohorlyCore(
     private var flushing = false
 
     private val automaticEvents: AutomaticEvents?
+
+    private val screenViews: ScreenViews? = if (config.trackScreenViews) ScreenViews(this) else null
 
     /** Last known flag results for the current distinct id. */
     private var flags: Map<String, FlagResult> = emptyMap()
@@ -245,6 +261,18 @@ class CohorlyCore(
                 random = replayRandom,
                 distinctId = distinctId,
                 optedOut = optedOut,
+                remoteConfig = if (replayConfig.remoteConfig && token != null) {
+                    ReplayRemoteConfigLoader(
+                        apiHost = this.apiHost,
+                        token = token,
+                        storage = replayRemoteConfigStorage ?: InMemoryStorage(),
+                        fetcher = replayConfigFetcher,
+                        executor = replayConfigExecutor ?: ThreadReplayExecutor(ThreadReplayExecutor.CONFIG_THREAD),
+                        clock = clock,
+                    )
+                } else {
+                    null
+                },
             )
         }
 
@@ -854,9 +882,13 @@ class CohorlyCore(
      * `$user_id` (only when identified) are stamped last but never override a
      * value the caller passed explicitly in [properties].
      */
-    fun track(event: String, properties: Map<String, Any?>?) {
+    fun track(event: String, properties: Map<String, Any?>?) = trackAt(event, properties, null)
+
+    /** Same as [track] with the event `time` (and session lookup) taken from [timeMs] instead of now. */
+    internal fun trackAt(event: String, properties: Map<String, Any?>?, timeMs: Long?) {
         synchronized(lock) {
             if (optedOut) return
+            val now = timeMs ?: clock.nowMillis()
             val props = JSONObject()
             for ((key, value) in deviceInfo.defaultProperties()) {
                 if (value != null) props.put(key, wrap(value))
@@ -871,7 +903,7 @@ class CohorlyCore(
                 props.put("\$duration", roundTo3(durationSec))
             }
             props.put("distinct_id", distinctId)
-            props.put("time", clock.nowMillis())
+            props.put("time", now)
             props.put("\$insert_id", UUID.randomUUID().toString())
             props.put("\$lib", LIB_NAME)
             if (token != null) props.put("token", token)
@@ -880,7 +912,7 @@ class CohorlyCore(
             if (!props.has("\$device_id")) props.put("\$device_id", deviceId)
             if (!anonymous && !props.has("\$user_id")) props.put("\$user_id", distinctId)
             // Read before the caller check: a tracked event is activity either way.
-            val sessionId = replay?.sessionIdForEvent(clock.nowMillis())
+            val sessionId = replay?.sessionIdForEvent(now)
             if (sessionId != null && !props.has("\$session_id")) props.put("\$session_id", sessionId)
 
             eventQueue.addLast(JSONObject().put("event", event).put("properties", props))
@@ -947,6 +979,29 @@ class CohorlyCore(
     fun onAppBackgrounded() {
         automaticEvents?.onBackground()
         replay?.onBackground()
+    }
+
+    // MARK: screen views (called by the Android lifecycle watcher)
+
+    /** An Activity became visible; a no-op unless `trackScreenViews` is on. */
+    fun onScreenResumed(instance: Any) {
+        screenViews?.onResumed(instance)
+    }
+
+    /** Dedupe decision only (call on the thread that owns the Activity); null when nothing is to be tracked. */
+    fun resolveScreen(instance: Any): String? = screenViews?.resolve(instance)
+
+    /** Tracks the `$screen` for a name from [resolveScreen] (call on the worker). */
+    fun trackScreen(name: String, timeMs: Long? = null) {
+        screenViews?.track(name, timeMs)
+    }
+
+    /** The clock of event times, so the glue can stamp a screen when it appears, not when the worker runs. */
+    fun nowMillis(): Long = clock.nowMillis()
+
+    /** An Activity was paused or destroyed; [isChangingConfigurations] marks a rotation-style recreation. */
+    fun onScreenLeft(instance: Any, isChangingConfigurations: Boolean) {
+        screenViews?.onLeft(instance, isChangingConfigurations)
     }
 
     // MARK: flush
