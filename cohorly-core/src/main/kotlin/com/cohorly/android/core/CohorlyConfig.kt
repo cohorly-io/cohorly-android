@@ -1,5 +1,7 @@
 package com.cohorly.android.core
 
+import com.cohorly.android.core.replay.SessionReplayConfig
+
 /**
  * Client configuration. Defaults follow the Cohorly sibling SDKs
  * (sdk-core / sdk-react-native / sdks/ios), not mixpanel-android:
@@ -66,6 +68,13 @@ data class CohorlyConfig(
      * [nativeCrashReporting]; takes effect on the next launch.
      */
     val anrWatchdog: Boolean = false,
+    /**
+     * Session replay. Null (the default) turns it off: no event carries
+     * `$session_id` and nothing replay-related is stored. Set, even with both
+     * rates at 0, every tracked event (and every `$exception` the in-process
+     * crash reporter records) carries the current `$session_id`.
+     */
+    val sessionReplay: SessionReplayConfig? = null,
 ) {
     companion object {
         const val DEFAULT_FLAG_CACHE_TTL_MS: Long = 86_400_000

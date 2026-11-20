@@ -11,8 +11,8 @@ import org.json.JSONObject
  * ```
  *
  * That shape is a contract with the React Native JS layer. [token],
- * [apiHost] and [anrWatchdog] are native-only extras written by the native
- * `Cohorly` SDK; they are never required. Anything else in the JSON is ignored.
+ * [apiHost], [anrWatchdog] and [sessionId] are native-only extras written by
+ * the native `Cohorly` SDK; they are never required. Anything else in the JSON is ignored.
  */
 data class CrashConfig(
     val enabled: Boolean,
@@ -24,6 +24,13 @@ data class CrashConfig(
     val apiHost: String? = null,
     val anrWatchdog: Boolean = false,
     val build: Long? = null,
+    /**
+     * `$session_id` of the replay session the app is in (native `Cohorly`
+     * with session replay only). Stamped on `$exception` events recorded in
+     * this process; never carried over by [merge], so a writer without it
+     * clears it.
+     */
+    val sessionId: String? = null,
 ) {
     fun toJson(): String = JSONObject().apply {
         put("enabled", enabled)
@@ -35,6 +42,7 @@ data class CrashConfig(
         apiHost?.let { put(KEY_API_HOST, it) }
         if (anrWatchdog) put(KEY_ANR_WATCHDOG, true)
         build?.let { put(KEY_BUILD, it) }
+        sessionId?.let { put(KEY_SESSION_ID, it) }
     }.toString()
 
     /**
@@ -60,6 +68,7 @@ data class CrashConfig(
         // The versionCode of the launch that wrote the config. Stamped on
         // every write, never carried over.
         const val KEY_BUILD = "build"
+        const val KEY_SESSION_ID = "sessionId"
         private val NATIVE_ONLY_KEYS = listOf(KEY_TOKEN, KEY_API_HOST, KEY_ANR_WATCHDOG)
 
         /** Null for absent or unparseable JSON. Only a JSON `true` enables. */
@@ -80,6 +89,7 @@ data class CrashConfig(
                 apiHost = obj.stringOrNull(KEY_API_HOST),
                 anrWatchdog = obj.opt(KEY_ANR_WATCHDOG) == true,
                 build = (obj.opt(KEY_BUILD) as? Number)?.toLong(),
+                sessionId = obj.stringOrNull(KEY_SESSION_ID),
             )
         }
 

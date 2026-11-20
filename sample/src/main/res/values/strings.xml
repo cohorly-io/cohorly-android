@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Cohorly Replay Sample</string>
+    <string name="main_title">Session replay sample</string>
+    <string name="name_hint">Name</string>
+    <string name="password_hint">Password</string>
+    <string name="image_description">Sample image</string>
+    <string name="secret_card">Card 4242 4242 4242 4242 (never recorded)</string>
+    <string name="open_dialog">Open dialog</string>
+    <string name="open_second">Open second screen</string>
+    <string name="dialog_title">A dialog</string>
+    <string name="dialog_message">Dialogs are their own window; the recording shows them on top.</string>
+    <string name="dialog_ok">OK</string>
+    <string name="second_title">Second screen</string>
+    <string name="back">Back</string>
+    <string name="crash">Crash</string>
+    <string name="open_compose">Open the Compose screen</string>
+    <string name="compose_title">Compose screen</string>
+    <string name="compose_plain_text">This text is recorded as it is.</string>
+</resources>

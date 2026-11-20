@@ -1,5 +1,7 @@
 package com.cohorly.android.core
 
+import com.cohorly.android.core.replay.ReplayChunkStore
+import com.cohorly.android.core.replay.ReplayExecutor
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
@@ -16,6 +18,19 @@ class MockTransport : CohorlyTransport {
     override fun post(url: String, body: String) {
         posts.add(Post(url, body))
         responder(url, body)
+    }
+
+    data class BytesPost(val url: String, val body: ByteArray, val headers: Map<String, String>)
+
+    /** Every [postBytes] call (session replay chunks). */
+    val bytePosts = mutableListOf<BytesPost>()
+
+    /** Called for each [postBytes] AFTER recording; throw to simulate a failure. */
+    var bytesResponder: (url: String, body: ByteArray) -> Unit = { _, _ -> }
+
+    override fun postBytes(url: String, body: ByteArray, headers: Map<String, String>) {
+        bytePosts.add(BytesPost(url, body, headers))
+        bytesResponder(url, body)
     }
 
     fun postsTo(path: String): List<Post> = posts.filter { it.url.endsWith(path) }
@@ -90,6 +105,12 @@ fun makeCore(
     jitter: () -> Double = { 0.0 },
     apiHost: String = "http://localhost:4000",
     flagsFetcher: CohorlyFlagsFetcher = MockFlagsFetcher(),
+    libVersion: String = "0.3.0",
+    replayChunkStore: ReplayChunkStore? = null,
+    replayStateStorage: CohorlyStorage? = null,
+    replayExecutor: ReplayExecutor? = null,
+    replayUploadExecutor: ReplayExecutor? = null,
+    replayRandom: () -> Double = { 0.5 },
 ): CohorlyCore = CohorlyCore(
     apiHost = apiHost,
     token = token,
@@ -100,4 +121,10 @@ fun makeCore(
     clock = clock,
     config = config,
     jitterSource = jitter,
+    libVersion = libVersion,
+    replayChunkStore = replayChunkStore,
+    replayStateStorage = replayStateStorage,
+    replayExecutor = replayExecutor,
+    replayUploadExecutor = replayUploadExecutor,
+    replayRandom = replayRandom,
 )

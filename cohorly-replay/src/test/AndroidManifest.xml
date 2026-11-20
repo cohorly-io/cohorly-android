@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Unit tests only: the pinned Compose (minSdk 23) runs under Robolectric at API 34; the
+     library itself keeps minSdk 21 and only compiles against Compose 1.0.0. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <uses-sdk tools:overrideLibrary="androidx.compose.animation,androidx.compose.animation.core,androidx.compose.foundation,androidx.compose.foundation.layout,androidx.compose.material,androidx.compose.material.ripple,androidx.compose.runtime,androidx.compose.runtime.annotation,androidx.compose.runtime.retain,androidx.compose.runtime.saveable,androidx.compose.ui,androidx.compose.ui.geometry,androidx.compose.ui.graphics,androidx.compose.ui.test,androidx.compose.ui.test.android,androidx.compose.ui.test.junit4,androidx.compose.ui.test.manifest,androidx.compose.ui.text,androidx.compose.ui.tooling,androidx.compose.ui.tooling.data,androidx.compose.ui.tooling.preview,androidx.compose.ui.unit,androidx.compose.ui.util,androidx.window,androidx.window.core" />
+</manifest>

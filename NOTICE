@@ -1,0 +1,51 @@
+Cohorly Android SDK
+Third-party notices
+
+This directory is published on its own (the public cohorly-android
+repository), so the notices for code it adapts are kept here as well as in
+the Cohorly repository's root NOTICE.
+
+posthog-android (https://github.com/PostHog/posthog-android)
+Copyright (c) 2023 PostHog. Licensed under the MIT License.
+
+The wireframe session replay recorder in cohorly-replay/ is adapted from
+posthog-android at commit 1101d79b: the wireframe path of
+posthog-android/src/main/java/com/posthog/android/replay/
+PostHogReplayIntegration.kt, internal/Throttler.kt, internal/NextDrawListener.kt
+and the wireframe part of internal/ViewTreeSnapshotStatus.kt, and the RR*
+event and wireframe types of posthog/src/main/java/com/posthog/internal/replay/.
+Its screenshot mode and Compose masking (VEL-2141) adapt, from the same
+commit, the screenshot and mask path of PostHogReplayIntegration.kt, the
+WindowDrawState check of internal/ViewTreeSnapshotStatus.kt,
+internal/PixelCopyBitmapBuffer.kt, internal/ScreenshotScaling.kt,
+ComposeImageMask.kt, the mask part of PostHogMaskModifier.kt, webpBase64 of
+internal/PostHogAndroidUtils.kt and the Compose rules of consumer-rules.pro.
+Each adapted file names its original path in its header. The license of that
+code:
+
+  MIT License
+
+  Copyright (c) [2023] [PostHog]
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+
+curtains (https://github.com/square/curtains)
+Copyright 2021 Square, Inc. Licensed under the Apache License, Version 2.0.
+A runtime dependency of cohorly-replay (com.squareup.curtains:curtains), not
+copied into this directory.

@@ -57,14 +57,59 @@ class CrashReporter(
     var handler: Handler? = null
         private set
 
+    /**
+     * The current replay `$session_id`, read in memory when an exception is
+     * recorded, so a rotation reaches the next crash without waiting for the
+     * config file. The native `Cohorly` sets it when it is created; while it
+     * is set, it is the only source (null: no `$session_id`).
+     *
+     * Without it, only a session id written to the config by this process
+     * ([updateConfig]) is stamped. The one [start] reads from disk was written
+     * by an earlier process, whose session may have ended, so it is dropped:
+     * the reporter starts from the startup provider, before the app creates
+     * `Cohorly`, so a sync before the reporter is active cannot be ensured.
+     */
+    @Volatile
+    var sessionIdProvider: (() -> String?)? = null
+
     private val installFallbackId: String by lazy { fallbackDeviceId(store, newInsertId) }
+
+    /** Copy on write: the crash handler reads it without a lock. */
+    @Volatile
+    private var listeners: List<CrashListener> = emptyList()
+
+    private val listenersLock = Any()
+
+    /**
+     * Calls [listener] after each report this reporter writes (see
+     * [CrashListener]); never for a report it did not write (reporting off).
+     * Returns the function that removes it. Any thread.
+     */
+    fun addListener(listener: CrashListener): () -> Unit {
+        synchronized(listenersLock) { listeners = listeners + listener }
+        return { synchronized(listenersLock) { listeners = listeners - listener } }
+    }
+
+    /**
+     * The `$session_id` the last report written carried (null: none), set
+     * before [CrashListener.onReport], so a listener acts on the session the
+     * report names even if the replay session rotated since.
+     */
+    @Volatile
+    var lastReportSessionId: String? = null
+        private set
+
+    /** True while the persisted (or updated) config enables reporting: a crash now would be written. */
+    val isRecording: Boolean
+        get() = isEnabled()
 
     /**
      * Returns false, having touched nothing, when the persisted config is
      * absent, invalid or not enabled. [exitRecords] is null below API 30.
      */
     fun start(exitRecords: (() -> List<ExitRecord>)?): Boolean {
-        val current = CrashConfig.readEnabled(store) ?: return false
+        // The stored session id belongs to the process that wrote it (see sessionIdProvider).
+        val current = CrashConfig.readEnabled(store)?.copy(sessionId = null) ?: return false
         config = current
         // Mint the fallback now rather than inside a crash handler.
         if (current.deviceId == null) installDeviceId()
@@ -129,8 +174,33 @@ class CrashReporter(
         }
         props.put("\$exception_list", JSONArray().put(entry))
         props.put("\$exception_level", "error")
+        val sessionId = sessionIdFor(current)
+        sessionId?.let { props.put("\$session_id", it) }
         pending.write(insertId, CrashEvents.event(props))
+        lastReportSessionId = sessionId
+        notifyListeners(fatal = false)
         background { runCatching { sendPending() } }
+    }
+
+    /** Each listener in turn; one that throws never stops the others nor the caller. */
+    private fun notifyListeners(fatal: Boolean) {
+        for (listener in listeners) {
+            try {
+                listener.onReport(fatal)
+            } catch (_: Throwable) {
+                // A listener must never cost the report.
+            }
+        }
+    }
+
+    /** The provider when set (even when it answers null), else the session id this process configured. */
+    private fun sessionIdFor(current: CrashConfig): String? {
+        val provider = sessionIdProvider ?: return current.sessionId
+        return try {
+            provider()
+        } catch (_: Throwable) {
+            null
+        }
     }
 
     private fun install() {
@@ -162,7 +232,13 @@ class CrashReporter(
         props.put("\$exception_list", CrashEvents.javaExceptionList(error))
         props.put("\$exception_level", "fatal")
         props.put("\$exception_threads", CrashEvents.javaThreads(threadDump(), thread))
+        val sessionId = sessionIdFor(current)
+        sessionId?.let { props.put("\$session_id", it) }
         pending.write(insertId, CrashEvents.event(props))
+        lastReportSessionId = sessionId
+        // Before the bounded send: the replay error buffer is written now and
+        // sent by the next launch, under the same `$session_id` as this report.
+        notifyListeners(fatal = true)
 
         // Sending only from the next launch delivered 0 of 8 crashes in a
         // crash loop (ADR-0020); a bounded try from here delivered 8 of 8.

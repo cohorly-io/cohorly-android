@@ -1,9 +1,22 @@
 # Cohorly Android SDK
 
+<!-- cohorly-mirror-notice:start -->
+> **This repository is a read-only mirror** of a private monorepo. Its
+> contents are generated on every release, so changes made here would be
+> overwritten.
+>
+> - Pull requests are not accepted for now.
+> - Bugs and questions: open an issue in this repository.
+> - Security vulnerabilities: follow [SECURITY.md](./SECURITY.md). Do not open
+>   a public issue.
+<!-- cohorly-mirror-notice:end -->
+
+
 Official Android client SDK for [Cohorly](../../README.md), the hosted
 Mixpanel-style product analytics platform. Kotlin, minSdk 21, zero third-party
 runtime dependencies (JSON via the platform's `org.json`, networking via
-`HttpURLConnection`).
+`HttpURLConnection`). The optional session replay recorder
+(`cohorly-android-replay`) adds Square's curtains.
 
 **Documentation:** [Android SDK reference](https://cohorly-docs.velloalabs.com/sdks/android) · [Quickstart](https://cohorly-docs.velloalabs.com/quickstart) · [HTTP API](https://cohorly-docs.velloalabs.com/api/ingestion)
 
@@ -25,7 +38,7 @@ dependencyResolutionManagement {
 
 // app/build.gradle.kts
 dependencies {
-    implementation("com.github.cohorly-io.cohorly-android:cohorly-android:v0.3.0")
+    implementation("com.github.cohorly-io.cohorly-android:cohorly-android:v0.4.0")
 }
 ```
 
@@ -38,7 +51,7 @@ cd sdks/android
 
 ```kotlin
 dependencies {
-    implementation("com.cohorly:cohorly-android:0.3.0") // mavenLocal()
+    implementation("com.cohorly:cohorly-android:0.4.0") // mavenLocal()
 }
 ```
 
@@ -246,7 +259,7 @@ wire format in [docs/NATIVE-SYMBOLICATION.md](../../docs/NATIVE-SYMBOLICATION.md
 | --- | --- | --- |
 | Uncaught Java/Kotlin exception | all | mechanism `uncaught_exception`, level `fatal`, cause chain + other threads |
 | ANR that killed the app | 30+ | type `ANR`, mechanism `anr`, level `fatal`, main thread stack |
-| Native crash (NDK signal) | 30+ | type = signal (`SIGSEGV`), mechanism `exit_info`, level `fatal`, tombstone frames |
+| Native crash (NDK signal) | 30+ | mechanism `exit_info`, level `fatal`; API 31+: type = signal (`SIGSEGV`), tombstone frames; API 30: no tombstone, so type `NativeCrash`, value = the exit description (`crash`), no frames |
 | Low-memory kill in the foreground | 30+ | type `LowMemoryKill`, mechanism `exit_info`, level `warning` |
 | Killed for excessive resource use | 30+ | type `ExcessiveResourceUsage`, mechanism `exit_info`, level `warning` |
 | Main thread blocked 5 s (opt-in watchdog) | all | type `ANR`, mechanism `anr`, level `error` |
@@ -310,6 +323,170 @@ How it behaves:
   (R8-obfuscated) and symbolicated on the server; a background low-memory kill
   is not an error and is not sent. Do not enable it alongside another native
   crash reporter's NDK/ANR handling.
+
+## Session replay
+
+Session replay records the screen as **wireframes** (the position, size,
+colors and text of each view) and plays it back in the Cohorly dashboard. By
+default no screenshot is taken: the only pixels that leave the device are the
+pictures of image views and image backgrounds, as small JPEGs, and only with
+`maskAllImages = false`. The recorder is a separate, optional artifact, so an
+app without it carries no replay code:
+
+```kotlin
+// app/build.gradle.kts
+dependencies {
+    implementation("com.github.cohorly-io.cohorly-android:cohorly-android:v0.4.0")
+    implementation("com.github.cohorly-io.cohorly-android:cohorly-android-replay:v0.4.0")
+    // or, from mavenLocal(): com.cohorly:cohorly-android-replay:0.4.0
+}
+```
+
+```kotlin
+import com.cohorly.android.core.replay.SessionReplayConfig
+
+Cohorly.getInstance(
+    context,
+    "YOUR_PROJECT_TOKEN",
+    config = CohorlyConfig(
+        sessionReplay = SessionReplayConfig(sampleRate = 0.1, onErrorSampleRate = 1.0, maskAllImages = true),
+    ),
+)
+```
+
+`SessionReplayConfig(sampleRate = 0.0, onErrorSampleRate = 0.0, maskAllImages = true)`
+has the web SDK's meaning: `sampleRate` is the share of sessions recorded in
+full, `onErrorSampleRate` the share of the others whose recent recording is
+sent when an error happens (see "Error mode" below). Rates outside 0..1 are
+clamped. Leaving
+`sessionReplay` null (the default) turns all of it off. With `sessionReplay`
+set and no `cohorly-android-replay` dependency, the SDK logs a warning and only
+stamps `$session_id`.
+
+The recorder's overhead (CPU, memory, frame time) has not been measured on a
+physical device yet, only exercised on emulators: measure it on your own
+entry-level devices before turning `sampleRate` up in production.
+
+- **Requirements.** Android 8.0 (API 26) or newer; below that nothing is
+  recorded and `$session_id` still works.
+- **Which windows.** Every window of the app's process that
+  [curtains](https://github.com/square/curtains) reports: Activities, Dialogs
+  (bottom sheets included) and PopupWindows (menus, spinners' lists), stacked
+  by window type in one snapshot. The screen name is the Activity of the
+  topmost Activity or Dialog window. Windows of other apps and of the system
+  (the keyboard, notifications, permission dialogs) are never recorded, and
+  nothing is captured while the app is in background.
+- **What is recorded.** Those windows at most once per second while the
+  screen changes and never while it is still, plus touch start/end with the
+  touched view. A full snapshot at the start of each session, on the return
+  from background, when the windows change (another Activity, a dialog opens)
+  and when views move to another parent or change order; small diffs
+  otherwise.
+- **Masking, always on.** Every `EditText`, every editable `TextView` (one
+  with a `KeyListener`) and every password field (a password input type or
+  `PasswordTransformationMethod`) has its text replaced by `*` of the same
+  length; the hint may show. There is no option to turn this off. Images are
+  hidden by default (`maskAllImages = true`: the player draws a placeholder);
+  with `maskAllImages = false` they are sent as small JPEGs. A `FLAG_SECURE`
+  window is recorded as one empty block, and a touch on it is not recorded.
+- **Hide a view.** Give it the tag `cohorly-no-capture`
+  (`CohorlyReplay.NO_CAPTURE_TAG`, or any String tag that contains it, e.g.
+  React Native's `testID`): the view and everything inside it become one
+  empty block. `contentDescription` is never read.
+
+  ```kotlin
+  cardView.tag = CohorlyReplay.NO_CAPTURE_TAG
+  ```
+  ```xml
+  <LinearLayout android:tag="cohorly-no-capture" ... />
+  ```
+- **Limitations.** `WebView` is drawn as an empty web block (its page is not
+  recorded), `SurfaceView` and `TextureView` (video, maps, camera, games) as
+  empty placeholders. Custom drawing (`onDraw`) is not reproduced: a custom
+  view shows as a box with its background color.
+- **Screenshots and Jetpack Compose.** `SessionReplayConfig(captureMode =
+  ReplayCaptureMode.SCREENSHOT, screenshotQuality = 30)` records a WebP image
+  of the screen instead of wireframes (default `ReplayCaptureMode.WIREFRAME`;
+  quality 0 to 100). The same fields, passwords, images (per `maskAllImages`)
+  and no-capture views are covered by an opaque block in the pixels before the
+  image leaves the device, `FLAG_SECURE` windows whole; a frame whose masks
+  cannot be trusted is dropped. Compose screens are recorded in both modes
+  from their semantics (texts, fields, images); keep a composable out with
+  `Modifier.cohorlyNoCapture()` (`com.cohorly.android.replay.compose`), which
+  covers its whole subtree. Compose is optional: an app without it loads none
+  of this.
+- **Chunks.** The recording is queued every 10 seconds (sooner at 512 KiB, and
+  when the app goes to background) into the upload queue below. The
+  `sdks/android/sample` app records a sample screen against a local server
+  (`./gradlew :sample:installDebug -PcohorlySampleToken=<token>`, plus
+  `-PcohorlySampleCaptureMode=SCREENSHOT` for screenshots; it has a Compose
+  screen too).
+- **Error mode (`onErrorSampleRate`).** A session drawn for error recording
+  keeps its recent recording in memory only; nothing leaves the device until
+  an error does. It needs `nativeCrashReporting = true`, and since the crash
+  reporter starts on the launch **after** the one that turned it on, error
+  mode records from that launch on (without a running crash reporter, a
+  session drawn for recording on error records nothing). What sends the buffer:
+  - a main thread blocked 5 s (the opt-in ANR watchdog): the buffer is queued
+    at once, at most one send every 5 s (a later error waits for the rest of
+    the interval, then goes with the same session's buffer);
+  - an uncaught exception: the buffer is written to the upload queue on the
+    crashing thread, before the crash report's own 2 s send, and goes out on
+    the next launch, under the same `$session_id` as the `$exception`.
+
+  Each send starts at a full snapshot, covers at least the last 30 s when
+  the recording is that old and never holds activity older than 60 s before
+  the error. A full snapshot is taken every 30 s while the screen changes, so
+  such a start exists. The buffer holds at most 10 MB of events (the oldest
+  snapshots go first, whole). A change between full and error recording (the
+  replay quota pause), a new session and an opt-out drop it. ANRs and native
+  crashes read from `ApplicationExitInfo` on the next launch send no buffer.
+
+- **`$session_id`.** With `sessionReplay` set, even with both rates at 0, every
+  tracked event carries `$session_id` (a random UUID), and so does every
+  `$exception` the crash reporter records in the running process (an uncaught
+  exception, the ANR watchdog), read from memory when the crash is captured,
+  so it is the session the crash happened in. A `$session_id` you pass
+  yourself wins. Read
+  the current one with `cohorly.replaySessionId`. ANRs, native crashes and
+  kills read from `ApplicationExitInfo` on the next launch do **not** carry
+  it: their values come from the 128-byte process state summary, which is
+  already full.
+- **Session rotation.** A new session (new id, a new sampling draw) starts on
+  the first foreground after 30 minutes in background, on the first activity
+  (a tracked event or a recorded touch) after 30 minutes in foreground without
+  any, on the first event once the session is 24 hours old, at once on `reset()`, and at launch when the app
+  was last active more than 30 minutes ago. Activity is written at most once a
+  minute, so at launch the threshold is 31 minutes since the last written
+  activity: a relaunch may extend a session by up to 1 minute, never cut one
+  short. The sampling draw happens once per session and is kept with it, so a
+  relaunch in the same session never draws again.
+- **Upload queue.** Recorded chunks are gzip files in
+  `no_backup/cohorly_replay_<token>/` (never backed up, see below), next to the
+  replay state (`state.json`: session, `seq` counters, quota pause), sent to
+  `POST <apiHost>/replay` oldest first from their own thread
+  (`cohorly-replay-upload`). Writes and session listeners run on
+  `cohorly-replay`, which never waits on the network. A chunk is queued with
+  the session id, distinct id and `seq` of the same moment, and one recorded
+  for a session that has since rotated is refused. They never enter
+  the event queue or its 1000-event cap. The directory is capped at 10 MB; past
+  that the oldest chunks are deleted. A chunk queued before a rotation is still
+  sent under the session it was recorded in.
+- **Retry.** 429, 408, 5xx and network errors keep the chunk and back off like
+  events do (base 2 s, doubling, capped at `maxRetryDelayMs`, +/-20% jitter,
+  `Retry-After` honored); a 401 waits the maximum delay; a 413, or a chunk over
+  1 MB, is split in two (a single event too large is dropped); any other 4xx
+  drops the chunk; a 404 stops replay until the next launch. When the project's
+  replay quota is used up, full-session recording pauses until the server's
+  `Retry-After` (one hour without it), across launches: that session's queued
+  full-session chunks are dropped and, like the web SDK, a session sampled for
+  full recording buffers like an error-mode one until the pause ends. Replay
+  failures never delay event uploads, and the other way round.
+- **Opt-out.** `optOutTracking()` stops the recorder, drops what it held in
+  memory, deletes every pending chunk and ends the
+  session (`replaySessionId` is null, no event carries `$session_id`) until
+  `optInTracking()`, which starts a new one (and recording again). A chunk that could not be deleted
+  is never sent and is deleted again at the next launch.
 
 ## Persistence and Android backup
 
@@ -381,6 +558,15 @@ Retry contract (shared across all Cohorly SDKs):
   `NoBackupFileStorage`, device info, lifecycle watcher, and the crash
   reporter's provider and platform adapters (`com.cohorly.android.crash`; the
   logic and its tests live in `cohorly-core`, `com.cohorly.android.core.crash`).
+  Session replay follows the same split: the session, chunk queue and
+  uploader live in `com.cohorly.android.core.replay`.
+- `cohorly-replay/` - the optional `com.android.library` recorder
+  (`cohorly-android-replay`): curtains for windows and touches, wireframes,
+  chunks. Parts are adapted from posthog-android (MIT): the notice and license
+  are in [`NOTICE`](NOTICE). Robolectric tests: `./gradlew :cohorly-replay:testDebugUnitTest`.
+- `sample/` - unpublished app that records a sample screen
+  (`-PcohorlySampleToken=<token>`, `-PcohorlySampleApiHost=<url>`, default
+  `http://10.0.2.2:4000`).
 
 ```bash
 ./gradlew test              # JVM unit tests

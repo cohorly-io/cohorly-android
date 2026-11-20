@@ -32,7 +32,7 @@ class NoBackupFileStorage(context: Context, token: String) : CohorlyStorage {
     init {
         val app = context.applicationContext
         val stamp = installStamp(app)
-        delegate = JsonFileStorage(File(app.noBackupFilesDir, "cohorly_${sanitize(token)}.json"))
+        delegate = JsonFileStorage(File(app.noBackupFilesDir, "cohorly_${fileSafe(token)}.json"))
         // One batch, so a fresh install pays a single write+fsync here rather
         // than one for the migration and another for the stamp.
         delegate.batch {
@@ -104,7 +104,10 @@ class NoBackupFileStorage(context: Context, token: String) : CohorlyStorage {
         app.packageManager.getPackageInfo(app.packageName, 0).firstInstallTime.toString()
     }.getOrNull()
 
-    private fun sanitize(token: String): String = token.map { ch ->
-        if (ch.isLetterOrDigit() || ch == '-' || ch == '_') ch else '_'
-    }.joinToString("")
+    internal companion object {
+        /** [token] as a file name part (also names the replay chunk directory). */
+        fun fileSafe(token: String): String = token.map { ch ->
+            if (ch.isLetterOrDigit() || ch == '-' || ch == '_') ch else '_'
+        }.joinToString("")
+    }
 }

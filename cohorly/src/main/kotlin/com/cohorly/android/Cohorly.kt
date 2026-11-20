@@ -2,6 +2,7 @@ package com.cohorly.android
 
 import android.app.Application
 import android.content.Context
+import android.util.Log
 import com.cohorly.android.core.CohorlyConfig
 import com.cohorly.android.core.CohorlyCore
 import com.cohorly.android.core.CohorlyFlagsFetcher
@@ -10,9 +11,14 @@ import com.cohorly.android.core.FlagDetails
 import com.cohorly.android.core.FlagResult
 import com.cohorly.android.core.HttpUrlConnectionFlagsFetcher
 import com.cohorly.android.core.HttpUrlConnectionTransport
+import com.cohorly.android.core.JsonFileStorage
 import com.cohorly.android.core.crash.CrashConfig
+import com.cohorly.android.core.replay.CohorlyReplayInternal
+import com.cohorly.android.core.replay.FileReplayChunkStore
+import com.cohorly.android.core.replay.ReplayController
 import com.cohorly.android.crash.CohorlyCrashReporter
 import org.json.JSONObject
+import java.io.File
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
@@ -55,6 +61,7 @@ class Cohorly private constructor(
          *                Defaults to the hosted endpoint [DEFAULT_API_HOST]; only set
          *                this to point at a different deployment.
          */
+        @OptIn(CohorlyReplayInternal::class)
         @JvmStatic
         @JvmOverloads
         fun getInstance(
@@ -70,6 +77,12 @@ class Cohorly private constructor(
 
                 val app = context.applicationContext
                 val storage = NoBackupFileStorage(app, token)
+                // no_backup/ like the rest of the SDK's state; the directory is
+                // created by the first chunk write, never without sessionReplay.
+                val replayDir = File(app.noBackupFilesDir, "cohorly_replay_${NoBackupFileStorage.fileSafe(token)}")
+                val replayStore = config.sessionReplay?.let { FileReplayChunkStore(replayDir) }
+                // The replay session, seq counters and quota pause, apart from the event file.
+                val replayState = config.sessionReplay?.let { JsonFileStorage(File(replayDir, "state.json")) }
                 // getInstance runs on the caller's thread, normally the main
                 // one. On a fresh install the core's constructor persists the
                 // distinct id, the anonymous flag and the device id; batching
@@ -83,6 +96,9 @@ class Cohorly private constructor(
                         deviceInfo = AndroidDeviceInfo(app),
                         flagsFetcher = flagsFetcher,
                         config = config,
+                        libVersion = AndroidDeviceInfo.LIB_VERSION,
+                        replayChunkStore = replayStore,
+                        replayStateStorage = replayState,
                     )
                 }
                 val executor = Executors.newSingleThreadScheduledExecutor { runnable ->
@@ -97,7 +113,17 @@ class Cohorly private constructor(
                     )
                 }
                 val instance = Cohorly(core, executor, app, token, apiHost.trimEnd('/'))
+                // A crash recorded in this process reads the session it happened
+                // in from memory at capture time; the config on disk follows each
+                // rotation for the RN layer and the process state summary.
+                // Only the instance that configures the reporter (the same check as
+                // syncCrashConfig) binds it, so a crash never pairs one project's
+                // token with another project's session.
+                if (config.nativeCrashReporting) {
+                    core.replay?.let { replay -> CohorlyCrashReporter.setSessionIdProvider { replay.sessionId } }
+                }
                 instance.syncCrashConfig()
+                core.replay?.addSessionListener { instance.syncCrashConfig() }
                 // First flag evaluation for the persisted identity, off the
                 // caller's thread. Fire and forget - failures keep the cache.
                 if (config.loadFeatureFlags) {
@@ -115,9 +141,41 @@ class Cohorly private constructor(
                     ),
                 )
                 instances[token] = instance
+                if (config.sessionReplay != null) installReplayRecorder(instance, app)
                 return instance
             }
         }
+
+        /** Class of the optional `cohorly-android-replay` module, looked up by name so this module never depends on it. */
+        internal const val REPLAY_INSTALLER = "com.cohorly.android.replay.ReplayInstaller"
+
+        /**
+         * With `sessionReplay` set, starts the recorder of the optional
+         * `cohorly-android-replay` module when the app has it. Without it,
+         * one warning: `$session_id` still works, nothing is recorded.
+         */
+        private fun installReplayRecorder(instance: Cohorly, app: Context) {
+            val application = app as? Application
+            if (application == null) {
+                Log.w(TAG, "Session replay needs an Application context; not recording.")
+                return
+            }
+            try {
+                Class.forName(REPLAY_INSTALLER)
+                    .getMethod("install", Cohorly::class.java, Application::class.java)
+                    .invoke(null, instance, application)
+            } catch (_: ClassNotFoundException) {
+                Log.w(
+                    TAG,
+                    "sessionReplay is set but com.cohorly:cohorly-android-replay is not a dependency: " +
+                        "\$session_id is stamped, nothing is recorded.",
+                )
+            } catch (e: Throwable) {
+                Log.w(TAG, "Could not start the session replay recorder: $e")
+            }
+        }
+
+        private const val TAG = "Cohorly"
 
         /** Convenience overload mirroring mixpanel's trackAutomaticEvents flag. */
         @JvmStatic
@@ -203,6 +261,20 @@ class Cohorly private constructor(
 
     /** True until [identify] assigns a real user id. */
     fun isAnonymous(): Boolean = core.isAnonymous()
+
+    // MARK: session replay
+
+    /**
+     * The `$session_id` stamped on every event, or null when
+     * [CohorlyConfig.sessionReplay] is not set (or after [optOutTracking]).
+     */
+    val replaySessionId: String?
+        get() = core.replay?.sessionId
+
+    /** The replay session and chunk queue, for the session replay recorder. */
+    @CohorlyReplayInternal
+    val replay: ReplayController?
+        get() = core.replay
 
     /** Clears identity, super properties, and unsent data (call on logout). */
     fun reset() {
@@ -413,6 +485,7 @@ class Cohorly private constructor(
                 token = token,
                 apiHost = apiHost,
                 anrWatchdog = core.config.anrWatchdog,
+                sessionId = core.replay?.sessionId,
             )
             CohorlyCrashReporter.configure(app, config.toJson())
         }

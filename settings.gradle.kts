@@ -18,3 +18,5 @@ rootProject.name = "cohorly-android"
 
 include(":cohorly-core")
 include(":cohorly")
+include(":cohorly-replay")
+include(":sample")

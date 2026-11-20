@@ -1,10 +1,15 @@
 package com.cohorly.android.core
 
+import com.cohorly.android.core.replay.InMemoryReplayChunkStore
+import com.cohorly.android.core.replay.ReplayChunkQueue
+import com.cohorly.android.core.replay.ReplayChunkStore
+import com.cohorly.android.core.replay.ReplayController
+import com.cohorly.android.core.replay.ReplayExecutor
+import com.cohorly.android.core.replay.ThreadReplayExecutor
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 import kotlin.math.min
-import kotlin.math.pow
 import kotlin.random.Random
 
 /**
@@ -35,6 +40,28 @@ class CohorlyCore(
     val config: CohorlyConfig = CohorlyConfig(),
     /** Jitter source in [-1, 1]; injectable for deterministic backoff tests. */
     private val jitterSource: () -> Double = { Random.nextDouble() * 2 - 1 },
+    /** SDK version sent as a replay chunk's `lib_version` (the Android module passes its own). */
+    libVersion: String = "unknown",
+    /**
+     * Where replay chunks are queued; only used with [CohorlyConfig.sessionReplay].
+     * Null keeps them in memory (the Android module passes a directory under `no_backup/`).
+     */
+    replayChunkStore: ReplayChunkStore? = null,
+    /**
+     * Replay state, separate from [storage] (the Android module passes
+     * `no_backup/cohorly_replay_<token>/state.json`); only used with
+     * [CohorlyConfig.sessionReplay]. Null keeps it in memory.
+     */
+    replayStateStorage: CohorlyStorage? = null,
+    /** Replay state thread; null starts a `cohorly-replay` thread when replay is configured. */
+    replayExecutor: ReplayExecutor? = null,
+    /**
+     * Replay upload thread; null starts `cohorly-replay-upload`, or reuses
+     * [replayExecutor] when only that one is given (tests).
+     */
+    replayUploadExecutor: ReplayExecutor? = null,
+    /** Sampling draws in [0, 1); injectable for deterministic replay tests. */
+    replayRandom: () -> Double = { Random.nextDouble() },
 ) {
     /**
      * Storage keys. `internal` rather than private so InstallGuard.kt can clear
@@ -73,8 +100,8 @@ class CohorlyCore(
         /** Server rejects /track batches above this size with a 400. */
         const val SERVER_MAX_BATCH = 500
 
-        /** Exponential backoff base, ms. */
-        const val BACKOFF_BASE_MS = 2_000L
+        /** Exponential backoff base, ms (shared with session replay, see [Backoff]). */
+        const val BACKOFF_BASE_MS = Backoff.BASE_MS
 
         /**
          * Hard staleness bound for the persisted flag cache under
@@ -162,6 +189,12 @@ class CohorlyCore(
 
     val people: People = People()
 
+    /**
+     * Session replay (`$session_id`, chunk queue and upload); null without
+     * [CohorlyConfig.sessionReplay].
+     */
+    val replay: ReplayController?
+
     init {
         val storedId = storage.get(Keys.DISTINCT_ID)
         if (storedId != null) {
@@ -191,6 +224,29 @@ class CohorlyCore(
         if (enforceEventQueueCap()) persistEventQueue()
 
         effectiveBatchSize = batchSize
+
+        // Before the automatic events, whose first track already carries $session_id.
+        replay = config.sessionReplay?.let { replayConfig ->
+            val stateExecutor = replayExecutor ?: ThreadReplayExecutor(ThreadReplayExecutor.STATE_THREAD)
+            ReplayController(
+                config = replayConfig,
+                state = replayStateStorage ?: InMemoryStorage(),
+                clock = clock,
+                stateExecutor = stateExecutor,
+                uploadExecutor = replayUploadExecutor
+                    ?: replayExecutor
+                    ?: ThreadReplayExecutor(ThreadReplayExecutor.UPLOAD_THREAD),
+                queue = ReplayChunkQueue(replayChunkStore ?: InMemoryReplayChunkStore(), libVersion),
+                transport = transport,
+                apiHost = this.apiHost,
+                token = token,
+                maxRetryDelayMs = config.maxRetryDelayMs,
+                jitterSource = jitterSource,
+                random = replayRandom,
+                distinctId = distinctId,
+                optedOut = optedOut,
+            )
+        }
 
         // Feature-flag cache, per config.flagPersistence: the persistent
         // modes adopt a valid cache immediately (synchronous reads cannot
@@ -252,6 +308,7 @@ class CohorlyCore(
             }
             distinctId = newDistinctId
             anonymous = false
+            replay?.identityChanged(newDistinctId)
             storage.set(Keys.DISTINCT_ID, distinctId)
             storage.set(Keys.ANONYMOUS, "0")
             // Exposures are per-identity: the new user must report its own.
@@ -323,6 +380,9 @@ class CohorlyCore(
             flagRequestSeq += 1
             storage.set(Keys.FLAGS, null)
             reportedExposures.clear()
+            // Inside the lock, with the new id: a tracked event or a replay
+            // chunk never pairs the new identity with the old session.
+            replay?.rotate(distinctId)
             flagListeners.values.toList()
         }
         // The served set changed to empty: notify listeners outside the
@@ -768,6 +828,7 @@ class CohorlyCore(
             persistEventQueue()
             persistEngageQueue()
         }
+        replay?.optOut()
     }
 
     fun optInTracking() {
@@ -775,6 +836,7 @@ class CohorlyCore(
             optedOut = false
             storage.set(Keys.OPT_OUT, "0")
         }
+        replay?.optIn()
     }
 
     fun hasOptedOutTracking(): Boolean = synchronized(lock) { optedOut }
@@ -817,6 +879,9 @@ class CohorlyCore(
             // the caller passed explicitly (mirrors Mixpanel's $device_id/$user_id).
             if (!props.has("\$device_id")) props.put("\$device_id", deviceId)
             if (!anonymous && !props.has("\$user_id")) props.put("\$user_id", distinctId)
+            // Read before the caller check: a tracked event is activity either way.
+            val sessionId = replay?.sessionIdForEvent(clock.nowMillis())
+            if (sessionId != null && !props.has("\$session_id")) props.put("\$session_id", sessionId)
 
             eventQueue.addLast(JSONObject().put("event", event).put("properties", props))
             enforceEventQueueCap()
@@ -874,11 +939,14 @@ class CohorlyCore(
     // MARK: automatic events (called by the Android lifecycle watcher)
 
     fun onAppForegrounded() {
+        // Rotation first, so the foreground's first events carry the new session.
+        replay?.onForeground()
         automaticEvents?.onForeground()
     }
 
     fun onAppBackgrounded() {
         automaticEvents?.onBackground()
+        replay?.onBackground()
     }
 
     // MARK: flush
@@ -990,12 +1058,7 @@ class CohorlyCore(
      * Exponential backoff: base 2s, doubling per consecutive failure, capped
      * at [CohorlyConfig.maxRetryDelayMs], with +/-20% jitter.
      */
-    private fun computeBackoffMs(): Long {
-        val exp = BACKOFF_BASE_MS * 2.0.pow(consecutiveFailures - 1)
-        val capped = min(exp, config.maxRetryDelayMs.toDouble())
-        val jitter = capped * 0.2 * jitterSource()
-        return (capped + jitter).toLong().coerceAtLeast(0)
-    }
+    private fun computeBackoffMs(): Long = Backoff.delayMs(consecutiveFailures, config.maxRetryDelayMs, jitterSource())
 
     /** Trims the queue to maxQueueSize, dropping the OLDEST events. */
     private fun enforceEventQueueCap(): Boolean {
